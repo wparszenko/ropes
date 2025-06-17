@@ -74,15 +74,40 @@ export function areRopesUntangled(ropes: Rope[]): boolean {
   return true;
 }
 
-// Generate a random point within bounds
-function getRandomPoint(bounds: GameBounds): RopeEndpoint {
+// Generate a random point within bounds with optional bias
+function getRandomPoint(bounds: GameBounds, biasX?: number, biasY?: number, variance = 1.0): RopeEndpoint {
+  const width = bounds.maxX - bounds.minX;
+  const height = bounds.maxY - bounds.minY;
+  
+  let x, y;
+  
+  if (biasX !== undefined && biasY !== undefined) {
+    // Generate point with bias towards a specific location
+    const maxOffset = Math.min(width, height) * 0.3 * variance;
+    x = biasX + (Math.random() - 0.5) * maxOffset;
+    y = biasY + (Math.random() - 0.5) * maxOffset;
+  } else {
+    // Pure random generation
+    x = bounds.minX + Math.random() * width;
+    y = bounds.minY + Math.random() * height;
+  }
+  
+  // Clamp to bounds
   return {
-    x: bounds.minX + Math.random() * (bounds.maxX - bounds.minX),
-    y: bounds.minY + Math.random() * (bounds.maxY - bounds.minY),
+    x: Math.max(bounds.minX, Math.min(bounds.maxX, x)),
+    y: Math.max(bounds.minY, Math.min(bounds.maxY, y)),
   };
 }
 
-// Generate ropes that are guaranteed to intersect with better positioning and longer length
+// Generate random angle with optional constraints
+function getRandomAngle(baseAngle?: number, variance = Math.PI): number {
+  if (baseAngle !== undefined) {
+    return baseAngle + (Math.random() - 0.5) * variance;
+  }
+  return Math.random() * 2 * Math.PI;
+}
+
+// Generate ropes that are guaranteed to intersect with randomization and 40% longer length
 export function generateCrossedRopes(ropeCount: number, bounds: GameBounds): Rope[] {
   const ropes: Rope[] = [];
   
@@ -90,91 +115,153 @@ export function generateCrossedRopes(ropeCount: number, bounds: GameBounds): Rop
   const centerX = (bounds.minX + bounds.maxX) / 2;
   const centerY = (bounds.minY + bounds.maxY) / 2;
   
-  // Make the play area larger for longer ropes
-  const playAreaWidth = (bounds.maxX - bounds.minX) * 0.85; // Increased from 0.7
-  const playAreaHeight = (bounds.maxY - bounds.minY) * 0.75; // Increased from 0.6
+  // Make the play area larger for 40% longer ropes
+  const playAreaWidth = (bounds.maxX - bounds.minX) * 0.95; // Increased from 0.85
+  const playAreaHeight = (bounds.maxY - bounds.minY) * 0.85; // Increased from 0.75
   
-  // Shift the center up by 15% of the height for better positioning
-  const adjustedCenterY = centerY - (bounds.maxY - bounds.minY) * 0.08;
+  // Shift the center up by 10% of the height for better positioning
+  const adjustedCenterY = centerY - (bounds.maxY - bounds.minY) * 0.05;
   
-  const maxRadius = Math.min(playAreaWidth, playAreaHeight) * 0.45; // Increased for longer ropes
+  // Increased radius for 40% longer ropes
+  const maxRadius = Math.min(playAreaWidth, playAreaHeight) * 0.63; // Increased from 0.45 (40% increase)
 
-  // Create ropes in a pattern that ensures they cross each other
+  // Add randomization seed based on current time and rope count
+  const randomSeed = Date.now() + ropeCount * 1000;
+  Math.random = (() => {
+    let seed = randomSeed;
+    return () => {
+      seed = (seed * 9301 + 49297) % 233280;
+      return seed / 233280;
+    };
+  })();
+
+  // Create ropes with randomized patterns that ensure they cross each other
   for (let i = 0; i < ropeCount; i++) {
     const color = ROPE_COLORS[i % ROPE_COLORS.length];
     
-    // Create ropes in different crossing patterns based on count
     let start: RopeEndpoint;
     let end: RopeEndpoint;
 
     if (ropeCount === 2) {
-      // Simple X pattern with longer ropes
+      // Enhanced X pattern with randomization and longer ropes
+      const randomOffset = (Math.random() - 0.5) * 0.4; // Random offset for variation
+      const lengthVariation = 0.9 + Math.random() * 0.2; // 90-110% of max length
+      
       if (i === 0) {
-        start = { x: centerX - maxRadius * 0.9, y: adjustedCenterY - maxRadius * 0.7 };
-        end = { x: centerX + maxRadius * 0.9, y: adjustedCenterY + maxRadius * 0.7 };
+        const angle1 = Math.PI * 0.25 + randomOffset; // ~45 degrees with variation
+        const angle2 = angle1 + Math.PI; // Opposite direction
+        start = {
+          x: centerX + Math.cos(angle1) * maxRadius * lengthVariation,
+          y: adjustedCenterY + Math.sin(angle1) * maxRadius * 0.8 * lengthVariation,
+        };
+        end = {
+          x: centerX + Math.cos(angle2) * maxRadius * lengthVariation,
+          y: adjustedCenterY + Math.sin(angle2) * maxRadius * 0.8 * lengthVariation,
+        };
       } else {
-        start = { x: centerX - maxRadius * 0.9, y: adjustedCenterY + maxRadius * 0.7 };
-        end = { x: centerX + maxRadius * 0.9, y: adjustedCenterY - maxRadius * 0.7 };
+        const angle1 = Math.PI * 0.75 + randomOffset; // ~135 degrees with variation
+        const angle2 = angle1 + Math.PI; // Opposite direction
+        start = {
+          x: centerX + Math.cos(angle1) * maxRadius * lengthVariation,
+          y: adjustedCenterY + Math.sin(angle1) * maxRadius * 0.8 * lengthVariation,
+        };
+        end = {
+          x: centerX + Math.cos(angle2) * maxRadius * lengthVariation,
+          y: adjustedCenterY + Math.sin(angle2) * maxRadius * 0.8 * lengthVariation,
+        };
       }
     } else if (ropeCount === 3) {
-      // Triangle with crossing lines - longer ropes
-      const angle = (i * 2 * Math.PI) / 3;
-      const oppositeAngle = angle + Math.PI;
+      // Randomized triangle with crossing lines - longer ropes
+      const baseAngle = (i * 2 * Math.PI) / 3;
+      const angleVariation = (Math.random() - 0.5) * 0.6; // ±30 degree variation
+      const lengthVariation = 0.85 + Math.random() * 0.3; // 85-115% of max length
+      
+      const angle = baseAngle + angleVariation;
+      const oppositeAngle = angle + Math.PI + (Math.random() - 0.5) * 0.4; // Slight variation in opposite angle
+      
       start = {
-        x: centerX + Math.cos(angle) * maxRadius * 0.9,
-        y: adjustedCenterY + Math.sin(angle) * maxRadius * 0.7,
+        x: centerX + Math.cos(angle) * maxRadius * lengthVariation,
+        y: adjustedCenterY + Math.sin(angle) * maxRadius * 0.8 * lengthVariation,
       };
       end = {
-        x: centerX + Math.cos(oppositeAngle) * maxRadius * 0.8,
-        y: adjustedCenterY + Math.sin(oppositeAngle) * maxRadius * 0.6,
+        x: centerX + Math.cos(oppositeAngle) * maxRadius * (0.8 + Math.random() * 0.3),
+        y: adjustedCenterY + Math.sin(oppositeAngle) * maxRadius * (0.7 + Math.random() * 0.2),
       };
     } else {
-      // For 4+ ropes, create a more complex crossing pattern with longer ropes
+      // Enhanced complex crossing pattern with more randomization and longer ropes
       const baseAngle = (i * 2 * Math.PI) / ropeCount;
-      const offsetAngle = baseAngle + Math.PI * (0.6 + (i % 3) * 0.2);
+      const angleVariation = (Math.random() - 0.5) * 0.8; // ±40 degree variation
+      const lengthVariation = 0.8 + Math.random() * 0.4; // 80-120% of max length
       
-      const startRadius = maxRadius * (0.8 + (i % 2) * 0.2);
-      const endRadius = maxRadius * (0.7 + ((i + 1) % 2) * 0.3);
+      // More random offset angle calculation
+      const offsetAngle = baseAngle + Math.PI * (0.5 + (Math.random() - 0.5) * 0.6) + angleVariation;
+      
+      // Randomize radius for each endpoint
+      const startRadius = maxRadius * (0.7 + Math.random() * 0.4) * lengthVariation;
+      const endRadius = maxRadius * (0.6 + Math.random() * 0.5) * lengthVariation;
+      
+      // Add some randomness to the compression factor
+      const compressionFactor = 0.75 + Math.random() * 0.2; // 75-95% compression
       
       start = {
-        x: centerX + Math.cos(baseAngle) * startRadius,
-        y: adjustedCenterY + Math.sin(baseAngle) * startRadius * 0.8, // Less compression for longer ropes
+        x: centerX + Math.cos(baseAngle + angleVariation) * startRadius,
+        y: adjustedCenterY + Math.sin(baseAngle + angleVariation) * startRadius * compressionFactor,
       };
       end = {
         x: centerX + Math.cos(offsetAngle) * endRadius,
-        y: adjustedCenterY + Math.sin(offsetAngle) * endRadius * 0.8, // Less compression for longer ropes
+        y: adjustedCenterY + Math.sin(offsetAngle) * endRadius * compressionFactor,
       };
     }
 
-    // Ensure points are within bounds with some padding
-    const padding = 15;
+    // Add additional randomization to final positions
+    const finalRandomization = 20; // Pixels of final random adjustment
+    start.x += (Math.random() - 0.5) * finalRandomization;
+    start.y += (Math.random() - 0.5) * finalRandomization;
+    end.x += (Math.random() - 0.5) * finalRandomization;
+    end.y += (Math.random() - 0.5) * finalRandomization;
+
+    // Ensure points are within bounds with padding
+    const padding = 20; // Increased padding for longer ropes
     start.x = Math.max(bounds.minX + padding, Math.min(bounds.maxX - padding, start.x));
     start.y = Math.max(bounds.minY + padding, Math.min(bounds.maxY - padding, start.y));
     end.x = Math.max(bounds.minX + padding, Math.min(bounds.maxX - padding, end.x));
     end.y = Math.max(bounds.minY + padding, Math.min(bounds.maxY - padding, end.y));
 
     ropes.push({
-      id: `rope_${i}`,
+      id: `rope_${i}_${Date.now()}_${Math.floor(Math.random() * 1000)}`, // Unique ID with randomization
       start,
       end,
       color,
     });
   }
 
-  // Verify that ropes are actually crossed - if not, adjust them
+  // Enhanced verification and adjustment system
   let attempts = 0;
-  while (!hasIntersections(ropes) && attempts < 10) {
-    // Slightly adjust rope positions to ensure crossings
+  const maxAttempts = 15; // Increased attempts for better results
+  
+  while (!hasIntersections(ropes) && attempts < maxAttempts) {
+    console.log(`Attempt ${attempts + 1}: Adjusting ropes to ensure crossings`);
+    
+    // More sophisticated adjustment algorithm
     for (let i = 0; i < ropes.length; i++) {
       const rope = ropes[i];
-      const adjustment = 12; // Reduced adjustment for more stable positioning
-      rope.start.x += (Math.random() - 0.5) * adjustment;
-      rope.start.y += (Math.random() - 0.5) * adjustment;
-      rope.end.x += (Math.random() - 0.5) * adjustment;
-      rope.end.y += (Math.random() - 0.5) * adjustment;
+      
+      // Calculate adjustment based on rope length and position
+      const ropeLength = Math.sqrt(
+        Math.pow(rope.end.x - rope.start.x, 2) + 
+        Math.pow(rope.end.y - rope.start.y, 2)
+      );
+      
+      const adjustmentFactor = Math.min(ropeLength * 0.1, 25); // Proportional to rope length
+      
+      // Apply random adjustments
+      rope.start.x += (Math.random() - 0.5) * adjustmentFactor;
+      rope.start.y += (Math.random() - 0.5) * adjustmentFactor;
+      rope.end.x += (Math.random() - 0.5) * adjustmentFactor;
+      rope.end.y += (Math.random() - 0.5) * adjustmentFactor;
 
       // Keep within bounds with padding
-      const padding = 15;
+      const padding = 20;
       rope.start.x = Math.max(bounds.minX + padding, Math.min(bounds.maxX - padding, rope.start.x));
       rope.start.y = Math.max(bounds.minY + padding, Math.min(bounds.maxY - padding, rope.start.y));
       rope.end.x = Math.max(bounds.minX + padding, Math.min(bounds.maxX - padding, rope.end.x));
@@ -182,6 +269,38 @@ export function generateCrossedRopes(ropeCount: number, bounds: GameBounds): Rop
     }
     attempts++;
   }
+
+  // If still no intersections after all attempts, force create intersections
+  if (!hasIntersections(ropes) && ropes.length >= 2) {
+    console.log('Forcing intersections by repositioning ropes');
+    
+    // Force the first two ropes to cross in the center area
+    const centerRegionSize = Math.min(playAreaWidth, playAreaHeight) * 0.3;
+    
+    ropes[0].start = {
+      x: centerX - centerRegionSize,
+      y: adjustedCenterY - centerRegionSize * 0.5,
+    };
+    ropes[0].end = {
+      x: centerX + centerRegionSize,
+      y: adjustedCenterY + centerRegionSize * 0.5,
+    };
+    
+    ropes[1].start = {
+      x: centerX - centerRegionSize,
+      y: adjustedCenterY + centerRegionSize * 0.5,
+    };
+    ropes[1].end = {
+      x: centerX + centerRegionSize,
+      y: adjustedCenterY - centerRegionSize * 0.5,
+    };
+  }
+
+  // Reset Math.random to default behavior
+  delete Math.random;
+
+  const finalIntersections = countIntersections(ropes);
+  console.log(`Generated ${ropeCount} ropes with ${finalIntersections} intersections (40% longer with randomization)`);
 
   return ropes;
 }

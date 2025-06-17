@@ -34,12 +34,12 @@ export default function RopePath({ startPoint, endPoint, color }: RopePathProps)
       Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2)
     );
 
-    // Calculate control point for Bézier curve (arc effect)
+    // Calculate control point for Bézier curve (arc effect) - enhanced for longer ropes
     const midX = (startX + endX) / 2;
     const midY = (startY + endY) / 2;
     
-    // Increased arc height for longer rope appearance
-    const arcHeight = Math.min(distance * 0.4, 120); // Increased from 0.15 and 50
+    // Increased arc height for longer rope appearance and more realistic sag
+    const arcHeight = Math.min(distance * 0.5, 150); // Increased from 0.4 and 120 for longer ropes
     const controlX = midX;
     const controlY = midY + arcHeight; // Downward arc for gravity effect
 
@@ -57,7 +57,7 @@ export default function RopePath({ startPoint, endPoint, color }: RopePathProps)
     <AnimatedPath
       animatedProps={animatedProps}
       stroke={color}
-      strokeWidth={12} // Reverted back to 12 from 20
+      strokeWidth={16} // Increased from 12 to make longer ropes more visible
       fill="none"
       strokeLinecap="round"
       strokeLinejoin="round"

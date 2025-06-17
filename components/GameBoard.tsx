@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useRef } from 'react';
 import { View, Text, Dimensions, Platform } from 'react-native';
 import { Svg } from 'react-native-svg';
 import { useSharedValue } from 'react-native-reanimated';
@@ -36,7 +36,7 @@ interface GameBoardProps {
 const MAX_ROPES = 20; // Maximum number of ropes we might ever have
 
 export default function GameBoard({ levelData }: GameBoardProps) {
-  const { currentLevel, completeLevel } = useGameStore();
+  const { currentLevel, completeLevel, gameState } = useGameStore();
   const { 
     ropes, 
     ropePositions, 
@@ -46,6 +46,9 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     updateRopePosition,
     checkIntersections 
   } = useRopeStore();
+
+  // Add ref to track if level completion has been triggered
+  const completionTriggeredRef = useRef(false);
 
   // Create a fixed number of shared values at the top level
   // This ensures the number of hook calls remains constant
@@ -62,6 +65,8 @@ export default function GameBoard({ levelData }: GameBoardProps) {
   // Initialize level when component mounts or level changes
   useEffect(() => {
     initializeLevel(currentLevel, GAME_BOUNDS);
+    // Reset completion trigger when level changes
+    completionTriggeredRef.current = false;
   }, [currentLevel, initializeLevel]);
 
   // Update shared values when positions change
@@ -78,15 +83,29 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     });
   }, [ropePositions, ropes]);
 
-  // Check for level completion
+  // Check for level completion with proper debouncing
   useEffect(() => {
-    if (isCompleted && ropes.length > 0) {
+    if (isCompleted && ropes.length > 0 && !completionTriggeredRef.current && gameState === 'playing') {
+      completionTriggeredRef.current = true;
+      
       setTimeout(() => {
-        const stars = currentLevel <= 3 ? 3 : currentLevel <= 6 ? 2 : 1;
-        completeLevel(stars);
+        // Calculate stars based on performance
+        const baseStars = 1;
+        const timeBonus = intersectionCount === 0 ? 1 : 0; // Bonus for perfect solution
+        const efficiencyBonus = currentLevel <= 3 ? 1 : currentLevel <= 6 ? 2 : 3; // Progressive bonus
+        
+        const totalStars = Math.min(baseStars + timeBonus + efficiencyBonus, 4); // Max 4 stars
+        completeLevel(totalStars);
       }, 500);
     }
-  }, [isCompleted, ropes.length, currentLevel, completeLevel]);
+  }, [isCompleted, ropes.length, currentLevel, completeLevel, intersectionCount, gameState]);
+
+  // Reset completion trigger when game state changes back to playing
+  useEffect(() => {
+    if (gameState === 'playing') {
+      completionTriggeredRef.current = false;
+    }
+  }, [gameState]);
 
   // Handle rope position updates with immediate callback
   const handlePositionChange = useCallback((ropeId: string, endpoint: 'start' | 'end', sharedX: any, sharedY: any) => {

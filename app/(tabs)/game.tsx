@@ -25,6 +25,7 @@ export default function GameScreen() {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [levelData, setLevelData] = useState(null);
   const [gameTime, setGameTime] = useState(0);
+  const [modalStars, setModalStars] = useState(0);
 
   useEffect(() => {
     const data = getCurrentLevelData();
@@ -32,10 +33,24 @@ export default function GameScreen() {
   }, [currentLevel]);
 
   useEffect(() => {
-    if (gameState === 'completed') {
+    if (gameState === 'completed' && !showCompleteModal) {
+      // Calculate stars based on performance
+      const maxStars = getMaxStarsForLevel(currentLevel);
+      const baseStars = 1;
+      
+      // Performance-based star calculation
+      let performanceStars = 0;
+      if (intersectionCount === 0) {
+        if (gameTime < 30) performanceStars = maxStars - 1; // Fast completion
+        else if (gameTime < 60) performanceStars = Math.max(1, maxStars - 2); // Medium completion
+        else performanceStars = Math.max(0, maxStars - 3); // Slow completion
+      }
+      
+      const totalStars = Math.min(baseStars + performanceStars, maxStars);
+      setModalStars(totalStars);
       setShowCompleteModal(true);
     }
-  }, [gameState]);
+  }, [gameState, showCompleteModal, currentLevel, getMaxStarsForLevel, intersectionCount, gameTime]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -55,6 +70,7 @@ export default function GameScreen() {
     resetGameLevel();
     resetRopeLevel();
     setGameTime(0);
+    setShowCompleteModal(false); // Ensure modal is closed on reset
   };
 
   const handleHint = () => {
@@ -74,6 +90,10 @@ export default function GameScreen() {
   const handleNextLevel = () => {
     setShowCompleteModal(false);
     // Modal will handle navigation internally
+  };
+
+  const handleCloseModal = () => {
+    setShowCompleteModal(false);
   };
 
   const formatTime = (seconds: number) => {
@@ -158,9 +178,9 @@ export default function GameScreen() {
       {/* Level Complete Modal */}
       <LevelCompleteModal
         visible={showCompleteModal}
-        onClose={() => setShowCompleteModal(false)}
+        onClose={handleCloseModal}
         onNextLevel={handleNextLevel}
-        stars={getMaxStarsForLevel(currentLevel)} // This will be calculated based on performance
+        stars={modalStars}
         level={currentLevel}
       />
     </View>

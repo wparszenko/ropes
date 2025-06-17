@@ -47,6 +47,8 @@ interface GameStore extends GameState {
   isLevelUnlocked: (level: number) => boolean;
   setTimeRemaining: (time: number) => void;
   decrementTime: () => void;
+  getLevelTimer: (level: number) => number;
+  calculateStarsForTime: (level: number, completionTime: number) => number;
 }
 
 const initialState: GameState = {
@@ -69,21 +71,43 @@ const initialState: GameState = {
   wireConnections: {},
   robotPosition: { x: 100, y: 100 },
   portalActive: false,
-  timeRemaining: 30,
+  timeRemaining: 10, // Will be set dynamically based on level
 };
 
 export const useGameStore = create<GameStore>((set, get) => ({
   ...initialState,
 
+  getLevelTimer: (level: number) => {
+    // Timer = number of ropes * 5 seconds
+    const ropeCount = Math.min(level + 1, 10);
+    return ropeCount * 5;
+  },
+
+  calculateStarsForTime: (level: number, completionTime: number) => {
+    const totalTime = get().getLevelTimer(level);
+    const timePerStar = Math.floor(totalTime / 3);
+    
+    if (completionTime <= timePerStar) {
+      return 3; // 3 stars
+    } else if (completionTime <= timePerStar * 2) {
+      return 2; // 2 stars
+    } else if (completionTime <= timePerStar * 3) {
+      return 1; // 1 star
+    } else {
+      return 0; // 0 stars
+    }
+  },
+
   setCurrentLevel: (level: number) => {
-    const { isLevelUnlocked } = get();
+    const { isLevelUnlocked, getLevelTimer } = get();
     if (isLevelUnlocked(level)) {
+      const levelTime = getLevelTimer(level);
       set({ 
         currentLevel: level, 
         gameState: 'playing',
         levelState: 'fresh', // Reset level state
         portalActive: false,
-        timeRemaining: 30,
+        timeRemaining: levelTime,
         wireConnections: {},
         robotPosition: { x: 100, y: 100 }
       });
@@ -91,13 +115,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   startLevel: () => {
-    const { levelState } = get();
+    const { levelState, currentLevel, getLevelTimer } = get();
     // Only start if level is fresh or we're explicitly restarting
     if (levelState === 'fresh' || levelState === 'failed') {
+      const levelTime = getLevelTimer(currentLevel);
       set({ 
         gameState: 'playing',
         levelState: 'playing',
-        timeRemaining: 30,
+        timeRemaining: levelTime,
         wireConnections: {},
         portalActive: false,
         robotPosition: { x: 100, y: 100 }
@@ -106,13 +131,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   resetLevel: () => {
+    const { currentLevel, getLevelTimer } = get();
+    const levelTime = getLevelTimer(currentLevel);
     set({ 
       gameState: 'playing',
       levelState: 'fresh', // Reset to fresh state
       wireConnections: {},
       portalActive: false,
       robotPosition: { x: 100, y: 100 },
-      timeRemaining: 30
+      timeRemaining: levelTime
     });
   },
 
@@ -205,7 +232,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         wireConnections: {},
         robotPosition: { x: 100, y: 100 },
         portalActive: false,
-        timeRemaining: 30,
+        timeRemaining: get().getLevelTimer(1), // Set initial timer for level 1
       });
       
       console.log('Progress reset completed successfully');
@@ -230,7 +257,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         wireConnections: {},
         robotPosition: { x: 100, y: 100 },
         portalActive: false,
-        timeRemaining: 30,
+        timeRemaining: get().getLevelTimer(1),
       });
       
       throw error; // Re-throw to let the UI handle the error
@@ -260,10 +287,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   getMaxStarsForLevel: (level: number) => {
-    // Progressive star system based on difficulty
-    if (level <= 5) return 1;      // Easy levels: max 1 star
-    if (level <= 15) return 2;     // Medium levels: max 2 stars  
-    return 3;                      // Hard levels: max 3 stars
+    // All levels can now have up to 3 stars based on completion time
+    return 3;
   },
 
   isLevelUnlocked: (level: number) => {
@@ -309,10 +334,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const savedState = await AsyncStorage.getItem('tangleEscapeGameState');
       if (savedState) {
         const parsedState = JSON.parse(savedState);
+        const { getLevelTimer } = get();
+        const levelTime = getLevelTimer(parsedState.currentLevel || 1);
+        
         set((state) => ({
           ...state,
           currentLevel: parsedState.currentLevel || 1,
           levelState: 'fresh', // Always start fresh when loading
+          timeRemaining: levelTime, // Set timer based on current level
           playerStats: {
             ...initialState.playerStats,
             ...parsedState.playerStats,

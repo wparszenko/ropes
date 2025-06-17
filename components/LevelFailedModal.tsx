@@ -20,7 +20,7 @@ export default function LevelFailedModal({
   onRetry,
   level,
 }: LevelFailedModalProps) {
-  const { resetLevel } = useGameStore();
+  const { resetLevel, getLevelTimer } = useGameStore();
   const { cleanupLevel, resetLevel: resetRopeLevel } = useRopeStore();
 
   const handleHome = () => {
@@ -46,6 +46,9 @@ export default function LevelFailedModal({
       resetRopeLevel(); // This will generate completely new ropes
     }, 200);
   };
+
+  const totalTime = getLevelTimer(level);
+  const timePerStar = Math.floor(totalTime / 3);
 
   return (
     <Modal
@@ -74,8 +77,8 @@ export default function LevelFailedModal({
           <View style={levelFailedModalStyles.messageContainer}>
             <Clock size={24} color="#FFE347" />
             <Text style={levelFailedModalStyles.messageText}>
-              You ran out of time! Try to untangle the ropes faster next time.
-              {'\n\n'}⭐⭐⭐ Complete in 5 seconds{'\n'}⭐⭐ Complete in 10 seconds{'\n'}⭐ Complete in 20 seconds
+              You ran out of time! You had {totalTime} seconds to complete this level.
+              {'\n\n'}⭐⭐⭐ Complete in {timePerStar} seconds{'\n'}⭐⭐ Complete in {timePerStar * 2} seconds{'\n'}⭐ Complete in {timePerStar * 3} seconds
             </Text>
           </View>
 

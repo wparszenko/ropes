@@ -70,6 +70,8 @@ export default function GameScreen() {
     decrementTime,
     completeLevel,
     failLevel,
+    getLevelTimer,
+    calculateStarsForTime,
   } = useGameStore();
 
   const { 
@@ -156,9 +158,10 @@ export default function GameScreen() {
     modalClosingRef.current = false;
     completionTriggeredRef.current = false;
     
-    // Reset timer to 30 seconds for new level
-    setTimeRemaining(30);
-  }, [currentLevel, getCurrentLevelData, setTimeRemaining]);
+    // Reset timer based on level
+    const levelTime = getLevelTimer(currentLevel);
+    setTimeRemaining(levelTime);
+  }, [currentLevel, getCurrentLevelData, setTimeRemaining, getLevelTimer]);
 
   // Start timer when level state becomes 'playing'
   useEffect(() => {
@@ -206,21 +209,12 @@ export default function GameScreen() {
       // Stop timer immediately on completion
       gameTimerRef.current?.stop();
 
-      const timeElapsed = 30 - timeRemaining;
+      const totalTime = getLevelTimer(currentLevel);
+      const timeElapsed = totalTime - timeRemaining;
       setCompletionTime(timeElapsed);
       
-      // Calculate stars based on completion time
-      let earnedStars = 0;
-      if (timeElapsed <= 5) {
-        earnedStars = 3; // 3 stars for completion in 5 seconds or less
-      } else if (timeElapsed <= 10) {
-        earnedStars = 2; // 2 stars for completion in 10 seconds or less
-      } else if (timeElapsed <= 20) {
-        earnedStars = 1; // 1 star for completion in 20 seconds or less
-      } else {
-        earnedStars = 0; // No stars for completion over 20 seconds
-      }
-      
+      // Calculate stars based on new system
+      const earnedStars = calculateStarsForTime(currentLevel, timeElapsed);
       setModalStars(earnedStars);
       
       // Complete the level in the game store
@@ -241,7 +235,9 @@ export default function GameScreen() {
     modalClosingRef.current, 
     modalShownForLevel.current, 
     timeRemaining, 
-    completeLevel
+    completeLevel,
+    getLevelTimer,
+    calculateStarsForTime
   ]);
 
   // Handle level failure - only show when actually failed and stop timer
@@ -307,9 +303,12 @@ export default function GameScreen() {
 
   const handleHint = () => {
     const ropeCount = ropes.length;
+    const totalTime = getLevelTimer(currentLevel);
+    const timePerStar = Math.floor(totalTime / 3);
+    
     Alert.alert(
       'How to Play',
-      `Drag the colored dots to move the rope endpoints. Your goal is to untangle all ${ropeCount} ropes so that none of them cross each other.\n\nStar System:\n⭐⭐⭐ Complete in 5 seconds\n⭐⭐ Complete in 10 seconds\n⭐ Complete in 20 seconds\n\nTip: Try to identify which ropes are crossing and move their endpoints to separate them.\n\nCurrent intersections: ${intersectionCount}`,
+      `Drag the colored dots to move the rope endpoints. Your goal is to untangle all ${ropeCount} ropes so that none of them cross each other.\n\nTime Limit: ${totalTime} seconds\n\nStar System:\n⭐⭐⭐ Complete in ${timePerStar} seconds\n⭐⭐ Complete in ${timePerStar * 2} seconds\n⭐ Complete in ${timePerStar * 3} seconds\n\nTip: Try to identify which ropes are crossing and move their endpoints to separate them.\n\nCurrent intersections: ${intersectionCount}`,
       [{ text: 'Got it!' }]
     );
   };
@@ -371,6 +370,8 @@ export default function GameScreen() {
   }
 
   const ropeCount = ropes.length || Math.min(currentLevel + 1, 10);
+  const totalTime = getLevelTimer(currentLevel);
+  const timePerStar = Math.floor(totalTime / 3);
 
   return (
     <View style={gameScreenStyles.container}>
@@ -384,7 +385,7 @@ export default function GameScreen() {
           <View style={gameScreenStyles.headerCenter}>
             <Text style={gameScreenStyles.levelTitle}>LEVEL {currentLevel}</Text>
             <Text style={gameScreenStyles.levelSubtitle}>
-              Untangle {ropeCount} Ropes
+              Untangle {ropeCount} Ropes in {totalTime}s
             </Text>
           </View>
 
@@ -396,10 +397,10 @@ export default function GameScreen() {
         {/* Game Stats */}
         <View style={gameScreenStyles.gameStats}>
           <View style={gameScreenStyles.statItem}>
-            <Clock size={16} color={timeRemaining <= 10 ? '#FF5050' : '#FFE347'} />
+            <Clock size={16} color={timeRemaining <= timePerStar ? '#FF5050' : '#FFE347'} />
             <Text style={[
               gameScreenStyles.statValue, 
-              { color: timeRemaining <= 10 ? '#FF5050' : '#FFE347' }
+              { color: timeRemaining <= timePerStar ? '#FF5050' : '#FFE347' }
             ]}>
               {timeRemaining}s
             </Text>

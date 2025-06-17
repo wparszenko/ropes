@@ -37,6 +37,12 @@ export default function GameScreen() {
   const modalShownForLevel = useRef<number | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const levelStartTime = useRef(30);
+  const gameStateRef = useRef(gameState);
+
+  // Update gameState ref when it changes
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
 
   useEffect(() => {
     const data = getCurrentLevelData();
@@ -146,9 +152,20 @@ export default function GameScreen() {
   };
 
   const handleCloseModal = () => {
+    // Ensure both modals are closed and state is reset
     setShowCompleteModal(false);
     setShowFailedModal(false);
     modalShownForLevel.current = null;
+    
+    // Force a small delay to prevent re-triggering
+    setTimeout(() => {
+      // Additional safety check
+      if (gameStateRef.current === 'completed' || gameStateRef.current === 'failed') {
+        // Reset game state to playing to prevent modal from showing again
+        resetGameLevel();
+        resetRopeLevel();
+      }
+    }, 100);
   };
 
   const formatTime = (seconds: number) => {

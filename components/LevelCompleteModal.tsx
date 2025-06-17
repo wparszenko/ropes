@@ -40,7 +40,10 @@ export default function LevelCompleteModal({
 
   const handleHome = () => {
     onClose(); // Ensure modal is closed first
-    router.push('/');
+    // Add a small delay to ensure modal state is updated before navigation
+    setTimeout(() => {
+      router.push('/(tabs)');
+    }, 100);
   };
 
   const handleRetry = () => {

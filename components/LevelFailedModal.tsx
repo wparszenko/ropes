@@ -20,13 +20,13 @@ export default function LevelFailedModal({
 }: LevelFailedModalProps) {
 
   const handleHome = () => {
-    router.push('/');
     onClose();
+    router.push('/');
   };
 
   const handleRetry = () => {
-    onRetry();
     onClose();
+    onRetry();
   };
 
   return (
@@ -57,6 +57,7 @@ export default function LevelFailedModal({
             <Clock size={24} color="#FFE347" />
             <Text style={levelFailedModalStyles.messageText}>
               You ran out of time! Try to untangle the ropes faster next time.
+              {'\n\n'}⭐⭐⭐ Complete in 5 seconds{'\n'}⭐⭐ Complete in 10 seconds{'\n'}⭐ Complete in 20 seconds
             </Text>
           </View>
 

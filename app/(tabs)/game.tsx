@@ -22,6 +22,7 @@ export default function GameScreen() {
     getMaxStarsForLevel,
     setTimeRemaining,
     decrementTime,
+    completeLevel,
   } = useGameStore();
 
   const { resetLevel: resetRopeLevel, ropes, intersectionCount } = useRopeStore();
@@ -30,10 +31,12 @@ export default function GameScreen() {
   const [showFailedModal, setShowFailedModal] = useState(false);
   const [levelData, setLevelData] = useState(null);
   const [modalStars, setModalStars] = useState(0);
+  const [completionTime, setCompletionTime] = useState(0);
   
   // Add ref to track if modal has been shown for current level
   const modalShownForLevel = useRef<number | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const levelStartTime = useRef(30);
 
   useEffect(() => {
     const data = getCurrentLevelData();
@@ -63,26 +66,38 @@ export default function GameScreen() {
     };
   }, [gameState, decrementTime]);
 
-  // Handle level completion
+  // Handle level completion with new star system
   useEffect(() => {
     if (
       gameState === 'completed' && 
       !showCompleteModal && 
       modalShownForLevel.current !== currentLevel
     ) {
-      // Calculate stars based on performance and difficulty
-      const maxStars = getMaxStarsForLevel(currentLevel);
-      let earnedStars = 1; // Base star for completion
+      const timeElapsed = 30 - timeRemaining;
+      setCompletionTime(timeElapsed);
       
-      // Time bonus (faster completion = more stars)
-      if (timeRemaining > 20 && maxStars >= 2) earnedStars = 2;
-      if (timeRemaining > 25 && maxStars >= 3) earnedStars = 3;
+      // New star system based on completion time
+      let earnedStars = 0;
+      if (timeElapsed <= 5) {
+        earnedStars = 3; // 3 stars for completion in 5 seconds or less
+      } else if (timeElapsed <= 10) {
+        earnedStars = 2; // 2 stars for completion in 10 seconds or less
+      } else if (timeElapsed <= 20) {
+        earnedStars = 1; // 1 star for completion in 20 seconds or less
+      } else {
+        earnedStars = 0; // No stars for completion over 20 seconds
+      }
       
       setModalStars(earnedStars);
+      
+      // Complete level with calculated stars
+      completeLevel(earnedStars);
+      
+      // Show modal immediately
       setShowCompleteModal(true);
       modalShownForLevel.current = currentLevel;
     }
-  }, [gameState, showCompleteModal, currentLevel, getMaxStarsForLevel, timeRemaining]);
+  }, [gameState, showCompleteModal, currentLevel, timeRemaining, completeLevel]);
 
   // Handle level failure
   useEffect(() => {
@@ -97,6 +112,7 @@ export default function GameScreen() {
     setShowCompleteModal(false);
     setShowFailedModal(false);
     setTimeRemaining(30); // Reset timer for new level
+    levelStartTime.current = 30;
   }, [currentLevel, setTimeRemaining]);
 
   const handleBack = () => {
@@ -113,10 +129,9 @@ export default function GameScreen() {
 
   const handleHint = () => {
     const ropeCount = ropes.length;
-    const maxStars = getMaxStarsForLevel(currentLevel);
     Alert.alert(
       'How to Play',
-      `Drag the colored dots to move the rope endpoints. Your goal is to untangle all ${ropeCount} ropes so that none of them cross each other. When all ropes are untangled, you win!\n\nThis level can earn up to ${maxStars} stars based on your performance.\n\nTip: Try to identify which ropes are crossing and move their endpoints to separate them.\n\nCurrent intersections: ${intersectionCount}`,
+      `Drag the colored dots to move the rope endpoints. Your goal is to untangle all ${ropeCount} ropes so that none of them cross each other.\n\nStar System:\n⭐⭐⭐ Complete in 5 seconds\n⭐⭐ Complete in 10 seconds\n⭐ Complete in 20 seconds\n\nTip: Try to identify which ropes are crossing and move their endpoints to separate them.\n\nCurrent intersections: ${intersectionCount}`,
       [{ text: 'Got it!' }]
     );
   };
@@ -155,7 +170,6 @@ export default function GameScreen() {
   }
 
   const ropeCount = ropes.length || Math.min(currentLevel + 1, 10);
-  const maxStars = getMaxStarsForLevel(currentLevel);
 
   return (
     <View style={gameScreenStyles.container}>
@@ -169,7 +183,7 @@ export default function GameScreen() {
           <View style={gameScreenStyles.headerCenter}>
             <Text style={gameScreenStyles.levelTitle}>LEVEL {currentLevel}</Text>
             <Text style={gameScreenStyles.levelSubtitle}>
-              Untangle {ropeCount} Ropes • Max {maxStars} ⭐
+              Untangle {ropeCount} Ropes
             </Text>
           </View>
 
@@ -228,6 +242,7 @@ export default function GameScreen() {
         onNextLevel={handleNextLevel}
         stars={modalStars}
         level={currentLevel}
+        completionTime={completionTime}
       />
 
       {/* Level Failed Modal */}

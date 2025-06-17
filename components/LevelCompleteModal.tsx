@@ -12,6 +12,7 @@ interface LevelCompleteModalProps {
   onNextLevel: () => void;
   stars: number;
   level: number;
+  completionTime?: number;
 }
 
 export default function LevelCompleteModal({
@@ -20,9 +21,9 @@ export default function LevelCompleteModal({
   onNextLevel,
   stars,
   level,
+  completionTime = 0,
 }: LevelCompleteModalProps) {
-  const { getMaxStarsForLevel, setCurrentLevel, isLevelUnlocked, resetLevel } = useGameStore();
-  const maxStars = getMaxStarsForLevel(level);
+  const { setCurrentLevel, isLevelUnlocked, resetLevel } = useGameStore();
   const nextLevel = level + 1;
   const hasNextLevel = isLevelUnlocked(nextLevel);
 
@@ -33,8 +34,8 @@ export default function LevelCompleteModal({
       // Stay in game screen, don't navigate to levels
     } else {
       // If no next level available, go to levels screen
-      router.push('/levels');
       onClose();
+      router.push('/levels');
     }
   };
 
@@ -46,6 +47,13 @@ export default function LevelCompleteModal({
   const handleRetry = () => {
     onClose();
     resetLevel(); // Reset the current level
+  };
+
+  const getStarMessage = (stars: number, time: number) => {
+    if (stars === 3) return `Amazing! Completed in ${time}s`;
+    if (stars === 2) return `Great! Completed in ${time}s`;
+    if (stars === 1) return `Good! Completed in ${time}s`;
+    return `Completed in ${time}s - Try faster for stars!`;
   };
 
   return (
@@ -72,12 +80,12 @@ export default function LevelCompleteModal({
 
           {/* Stars */}
           <View style={levelCompleteModalStyles.starsContainer}>
-            {Array.from({ length: maxStars }, (_, index) => (
+            {[1, 2, 3].map((star) => (
               <Star
-                key={index}
+                key={star}
                 size={40}
-                color={index < stars ? '#FFE347' : '#64748B'}
-                fill={index < stars ? '#FFE347' : 'transparent'}
+                color={star <= stars ? '#FFE347' : '#64748B'}
+                fill={star <= stars ? '#FFE347' : 'transparent'}
               />
             ))}
           </View>
@@ -88,15 +96,16 @@ export default function LevelCompleteModal({
               Performance
             </Text>
             <View style={levelCompleteModalStyles.statRow}>
-              <Text style={levelCompleteModalStyles.statLabel}>Stars Earned:</Text>
-              <Text style={levelCompleteModalStyles.statValue}>{stars}/{maxStars}</Text>
+              <Text style={levelCompleteModalStyles.statLabel}>Time:</Text>
+              <Text style={levelCompleteModalStyles.statValue}>{completionTime}s</Text>
             </View>
             <View style={levelCompleteModalStyles.statRow}>
-              <Text style={levelCompleteModalStyles.statLabel}>Difficulty:</Text>
-              <Text style={levelCompleteModalStyles.statValue}>
-                {level <= 5 ? 'Easy' : level <= 15 ? 'Medium' : 'Hard'}
-              </Text>
+              <Text style={levelCompleteModalStyles.statLabel}>Stars:</Text>
+              <Text style={levelCompleteModalStyles.statValue}>{stars}/3</Text>
             </View>
+            <Text style={levelCompleteModalStyles.performanceMessage}>
+              {getStarMessage(stars, completionTime)}
+            </Text>
           </View>
 
           {/* Action Buttons */}

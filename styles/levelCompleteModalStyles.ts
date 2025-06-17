@@ -65,6 +65,13 @@ export const levelCompleteModalStyles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  performanceMessage: {
+    color: '#FFE347',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
   buttonContainer: {
     gap: 12,
   },

@@ -38,8 +38,8 @@ export default function RopePath({ startPoint, endPoint, color }: RopePathProps)
     const midX = (startX + endX) / 2;
     const midY = (startY + endY) / 2;
     
-    // Reduced arc height to minimize jumping during movement
-    const arcHeight = Math.min(distance * 0.15, 50); // Reduced from 0.3 and 100
+    // Increased arc height for longer rope appearance
+    const arcHeight = Math.min(distance * 0.4, 120); // Increased from 0.15 and 50
     const controlX = midX;
     const controlY = midY + arcHeight; // Downward arc for gravity effect
 
@@ -57,7 +57,7 @@ export default function RopePath({ startPoint, endPoint, color }: RopePathProps)
     <AnimatedPath
       animatedProps={animatedProps}
       stroke={color}
-      strokeWidth={20} // Increased from 12 to 20 for much thicker ropes
+      strokeWidth={12} // Reverted back to 12 from 20
       fill="none"
       strokeLinecap="round"
       strokeLinejoin="round"

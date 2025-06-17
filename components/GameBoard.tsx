@@ -35,55 +35,6 @@ interface GameBoardProps {
 
 const MAX_ROPES = 20; // Maximum number of ropes we might ever have
 
-// Memory management for timeouts and intervals
-class ComponentTimeoutManager {
-  private timeouts: Set<NodeJS.Timeout> = new Set();
-  private animationFrames: Set<number> = new Set();
-  
-  setTimeout(callback: () => void, delay: number): NodeJS.Timeout {
-    const timeout = setTimeout(() => {
-      this.timeouts.delete(timeout);
-      callback();
-    }, delay);
-    this.timeouts.add(timeout);
-    return timeout;
-  }
-  
-  requestAnimationFrame(callback: () => void): number {
-    const frame = requestAnimationFrame(() => {
-      this.animationFrames.delete(frame);
-      callback();
-    });
-    this.animationFrames.add(frame);
-    return frame;
-  }
-  
-  clearTimeout(timeout: NodeJS.Timeout | null) {
-    if (timeout) {
-      clearTimeout(timeout);
-      this.timeouts.delete(timeout);
-    }
-  }
-  
-  cancelAnimationFrame(frame: number | null) {
-    if (frame) {
-      cancelAnimationFrame(frame);
-      this.animationFrames.delete(frame);
-    }
-  }
-  
-  clearAll() {
-    this.timeouts.forEach(timeout => clearTimeout(timeout));
-    this.animationFrames.forEach(frame => cancelAnimationFrame(frame));
-    this.timeouts.clear();
-    this.animationFrames.clear();
-  }
-  
-  getActiveCount() {
-    return this.timeouts.size + this.animationFrames.size;
-  }
-}
-
 export default function GameBoard({ levelData }: GameBoardProps) {
   const { currentLevel, completeLevel, gameState } = useGameStore();
   const { 
@@ -103,11 +54,8 @@ export default function GameBoard({ levelData }: GameBoardProps) {
   // Add ref to track if level completion has been triggered
   const completionTriggeredRef = useRef(false);
   const levelRef = useRef(currentLevel);
-  const timeoutManager = useRef(new ComponentTimeoutManager());
-  
-  // Performance optimization: Batch position updates
-  const positionUpdateBatch = useRef<Map<string, any>>(new Map());
-  const batchUpdateFrame = useRef<number | null>(null);
+  const initializationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const positionUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Create a fixed number of shared values at the top level
   // This ensures the number of hook calls remains constant
@@ -125,15 +73,6 @@ export default function GameBoard({ levelData }: GameBoardProps) {
   useEffect(() => {
     if (currentLevel !== levelRef.current) {
       console.log(`GameBoard: Level changed from ${levelRef.current} to ${currentLevel}, cleaning up`);
-      
-      // Clear all pending operations
-      timeoutManager.current.clearAll();
-      if (batchUpdateFrame.current) {
-        cancelAnimationFrame(batchUpdateFrame.current);
-        batchUpdateFrame.current = null;
-      }
-      positionUpdateBatch.current.clear();
-      
       cleanupLevel(); // Clean up previous level data
       completionTriggeredRef.current = false;
       levelRef.current = currentLevel;
@@ -143,11 +82,13 @@ export default function GameBoard({ levelData }: GameBoardProps) {
   // Initialize level when component mounts or level changes
   useEffect(() => {
     if (currentLevel !== levelRef.current || !isInitialized) {
-      // Clear any existing operations
-      timeoutManager.current.clearAll();
+      // Clear any existing timeout
+      if (initializationTimeoutRef.current) {
+        clearTimeout(initializationTimeoutRef.current);
+      }
 
       // Add a small delay to ensure proper initialization
-      const initTimeout = timeoutManager.current.setTimeout(() => {
+      initializationTimeoutRef.current = setTimeout(() => {
         try {
           console.log(`GameBoard: Initializing level ${currentLevel}`);
           initializeLevel(currentLevel, GAME_BOUNDS);
@@ -158,66 +99,60 @@ export default function GameBoard({ levelData }: GameBoardProps) {
         }
       }, 100);
     }
-  }, [currentLevel, initializeLevel, isInitialized]);
 
-  // Performance optimization: Batch position updates with reduced frequency
-  const processBatchUpdate = useCallback(() => {
-    if (positionUpdateBatch.current.size === 0) return;
-    
-    // Validate positions first
-    validatePositions();
-    
-    // Process all batched updates
-    const updates = Array.from(positionUpdateBatch.current.entries());
-    positionUpdateBatch.current.clear();
-    
-    updates.forEach(([index, { position, shared }]) => {
-      if (shared && parseInt(index) < MAX_ROPES) {
-        // Validate position values before setting - avoid reading during render
-        const startX = isNaN(position.startX) ? GAME_BOUNDS.minX + 50 : position.startX;
-        const startY = isNaN(position.startY) ? GAME_BOUNDS.minY + 50 : position.startY;
-        const endX = isNaN(position.endX) ? GAME_BOUNDS.maxX - 50 : position.endX;
-        const endY = isNaN(position.endY) ? GAME_BOUNDS.maxY - 50 : position.endY;
-        
-        // Set values outside of render cycle
-        shared.startX.value = startX;
-        shared.startY.value = startY;
-        shared.endX.value = endX;
-        shared.endY.value = endY;
+    return () => {
+      if (initializationTimeoutRef.current) {
+        clearTimeout(initializationTimeoutRef.current);
       }
-    });
-    
-    batchUpdateFrame.current = null;
-  }, [validatePositions]);
+    };
+  }, [currentLevel, initializeLevel, isInitialized]);
 
   // Performance optimization: Batch position updates and reduce frequency
   useEffect(() => {
     if (isInitialized && ropes.length > 0) {
-      // Clear any pending batch update
-      if (batchUpdateFrame.current) {
-        cancelAnimationFrame(batchUpdateFrame.current);
+      // Clear any pending position update
+      if (positionUpdateTimeoutRef.current) {
+        clearTimeout(positionUpdateTimeoutRef.current);
       }
 
-      // Batch position updates for better performance
-      ropes.forEach((rope, index) => {
-        const position = ropePositions[rope.id];
-        const shared = sharedValues[index];
-        if (position && shared && index < MAX_ROPES) {
-          positionUpdateBatch.current.set(index.toString(), { position, shared });
-        }
-      });
-      
-      // Process batch update on next frame
-      batchUpdateFrame.current = timeoutManager.current.requestAnimationFrame(processBatchUpdate);
+      // Batch position updates with longer delay for better performance
+      positionUpdateTimeoutRef.current = setTimeout(() => {
+        // Validate positions first
+        validatePositions();
+        
+        // Update shared values in batches to reduce render cycles
+        const updates = [];
+        ropes.forEach((rope, index) => {
+          const position = ropePositions[rope.id];
+          const shared = sharedValues[index];
+          if (position && shared && index < MAX_ROPES) {
+            updates.push({ position, shared, index });
+          }
+        });
+        
+        // Apply all updates at once
+        updates.forEach(({ position, shared }) => {
+          // Validate position values before setting - avoid reading during render
+          const startX = isNaN(position.startX) ? GAME_BOUNDS.minX + 50 : position.startX;
+          const startY = isNaN(position.startY) ? GAME_BOUNDS.minY + 50 : position.startY;
+          const endX = isNaN(position.endX) ? GAME_BOUNDS.maxX - 50 : position.endX;
+          const endY = isNaN(position.endY) ? GAME_BOUNDS.maxY - 50 : position.endY;
+          
+          // Set values outside of render cycle
+          shared.startX.value = startX;
+          shared.startY.value = startY;
+          shared.endX.value = endX;
+          shared.endY.value = endY;
+        });
+      }, 32); // ~30fps update rate for better performance
     }
 
     return () => {
-      if (batchUpdateFrame.current) {
-        cancelAnimationFrame(batchUpdateFrame.current);
-        batchUpdateFrame.current = null;
+      if (positionUpdateTimeoutRef.current) {
+        clearTimeout(positionUpdateTimeoutRef.current);
       }
     };
-  }, [ropePositions, ropes, isInitialized, processBatchUpdate]);
+  }, [ropePositions, ropes, isInitialized, validatePositions]);
 
   // Check for level completion with proper debouncing - only when not dragging
   useEffect(() => {
@@ -231,7 +166,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     ) {
       completionTriggeredRef.current = true;
       
-      timeoutManager.current.setTimeout(() => {
+      setTimeout(() => {
         // Calculate stars based on performance
         const baseStars = 1;
         const timeBonus = intersectionCount === 0 ? 1 : 0; // Bonus for perfect solution
@@ -239,7 +174,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
         
         const totalStars = Math.min(baseStars + timeBonus + efficiencyBonus, 4); // Max 4 stars
         completeLevel(totalStars);
-      }, 200); // Reduced delay for better responsiveness
+      }, 300); // Reduced delay for better responsiveness
     }
   }, [isCompleted, ropes.length, currentLevel, completeLevel, intersectionCount, gameState, isDragging, isInitialized]);
 
@@ -254,42 +189,33 @@ export default function GameBoard({ levelData }: GameBoardProps) {
   useEffect(() => {
     return () => {
       console.log('GameBoard: Unmounting, cleaning up data');
-      
-      // Clear all managed timeouts and frames
-      timeoutManager.current.clearAll();
-      
-      if (batchUpdateFrame.current) {
-        cancelAnimationFrame(batchUpdateFrame.current);
-      }
-      
-      positionUpdateBatch.current.clear();
       cleanupLevel();
-      
-      console.log(`GameBoard cleanup complete. Active operations: ${timeoutManager.current.getActiveCount()}`);
+      if (initializationTimeoutRef.current) {
+        clearTimeout(initializationTimeoutRef.current);
+      }
+      if (positionUpdateTimeoutRef.current) {
+        clearTimeout(positionUpdateTimeoutRef.current);
+      }
     };
   }, [cleanupLevel]);
 
-  // Performance optimized position change handler with batching
+  // Performance optimized position change handler
   const handlePositionChange = useCallback((ropeId: string, endpoint: 'start' | 'end', sharedX: any, sharedY: any) => {
     // Use a callback to avoid reading shared values during render
     const updatePosition = () => {
-      try {
-        // Validate shared values before using them
-        const x = isNaN(sharedX.value) ? GAME_BOUNDS.minX + 50 : sharedX.value;
-        const y = isNaN(sharedY.value) ? GAME_BOUNDS.minY + 50 : sharedY.value;
-        
-        const positionUpdate = endpoint === 'start' 
-          ? { startX: x, startY: y }
-          : { endX: x, endY: y };
-        
-        updateRopePosition(ropeId, positionUpdate);
-      } catch (error) {
-        console.warn('Position update failed:', error);
-      }
+      // Validate shared values before using them
+      const x = isNaN(sharedX.value) ? GAME_BOUNDS.minX + 50 : sharedX.value;
+      const y = isNaN(sharedY.value) ? GAME_BOUNDS.minY + 50 : sharedY.value;
+      
+      const positionUpdate = endpoint === 'start' 
+        ? { startX: x, startY: y }
+        : { endX: x, endY: y };
+      
+      updateRopePosition(ropeId, positionUpdate);
     };
     
-    // Use timeout manager for proper cleanup
-    timeoutManager.current.requestAnimationFrame(updatePosition);
+    // Defer the update to avoid reading during render and batch updates
+    requestAnimationFrame(updatePosition);
   }, [updateRopePosition]);
 
   // Show loading state while initializing

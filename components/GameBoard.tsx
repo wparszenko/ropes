@@ -59,6 +59,11 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     });
   }
 
+  // Initialize level when component mounts or level changes
+  useEffect(() => {
+    initializeLevel(currentLevel, GAME_BOUNDS);
+  }, [currentLevel, initializeLevel]);
+
   // Update shared values when positions change
   useEffect(() => {
     ropes.forEach((rope, index) => {
@@ -73,11 +78,6 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     });
   }, [ropePositions, ropes]);
 
-  // Initialize level when component mounts or level changes
-  useEffect(() => {
-    initializeLevel(currentLevel, GAME_BOUNDS);
-  }, [currentLevel, initializeLevel]);
-
   // Check for level completion
   useEffect(() => {
     if (isCompleted && ropes.length > 0) {
@@ -88,11 +88,11 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     }
   }, [isCompleted, ropes.length, currentLevel, completeLevel]);
 
-  // Handle rope position updates
-  const handlePositionChange = useCallback((ropeId: string, endpoint: 'start' | 'end', x: number, y: number) => {
+  // Handle rope position updates with immediate callback
+  const handlePositionChange = useCallback((ropeId: string, endpoint: 'start' | 'end', sharedX: any, sharedY: any) => {
     const positionUpdate = endpoint === 'start' 
-      ? { startX: x, startY: y }
-      : { endX: x, endY: y };
+      ? { startX: sharedX.value, startY: sharedY.value }
+      : { endX: sharedX.value, endY: sharedY.value };
     
     updateRopePosition(ropeId, positionUpdate);
   }, [updateRopePosition]);
@@ -142,12 +142,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
                 color={rope.color}
                 bounds={GAME_BOUNDS}
                 onPositionChange={() => {
-                  handlePositionChange(
-                    rope.id, 
-                    'start', 
-                    shared.startX.value, 
-                    shared.startY.value
-                  );
+                  handlePositionChange(rope.id, 'start', shared.startX, shared.startY);
                 }}
               />
               <DraggableDot 
@@ -155,12 +150,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
                 color={rope.color}
                 bounds={GAME_BOUNDS}
                 onPositionChange={() => {
-                  handlePositionChange(
-                    rope.id, 
-                    'end', 
-                    shared.endX.value, 
-                    shared.endY.value
-                  );
+                  handlePositionChange(rope.id, 'end', shared.endX, shared.endY);
                 }}
               />
             </React.Fragment>

@@ -20,10 +20,10 @@ interface DraggableDotProps {
   color?: string;
   onPositionChange?: () => void;
   bounds?: {
-    MIN_X: number;
-    MAX_X: number;
-    MIN_Y: number;
-    MAX_Y: number;
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
   };
 }
 
@@ -37,7 +37,7 @@ export default function DraggableDot({
   position, 
   color = '#2ECC71', 
   onPositionChange,
-  bounds = { MIN_X: 40, MAX_X: 320, MIN_Y: 40, MAX_Y: 600 }
+  bounds = { minX: 40, maxX: 320, minY: 40, maxY: 600 }
 }: DraggableDotProps) {
   
   // Store the starting position when gesture begins
@@ -56,17 +56,21 @@ export default function DraggableDot({
       onPanResponderMove: (evt, gestureState) => {
         const newX = clamp(
           startX.value + gestureState.dx,
-          bounds.MIN_X,
-          bounds.MAX_X
+          bounds.minX,
+          bounds.maxX
         );
         const newY = clamp(
           startY.value + gestureState.dy,
-          bounds.MIN_Y,
-          bounds.MAX_Y
+          bounds.minY,
+          bounds.maxY
         );
         
         position.x.value = newX;
         position.y.value = newY;
+        
+        if (onPositionChange) {
+          onPositionChange();
+        }
       },
       onPanResponderRelease: () => {
         position.x.value = withSpring(position.x.value, {
@@ -96,17 +100,21 @@ export default function DraggableDot({
       'worklet';
       const newX = clamp(
         startX.value + event.translationX,
-        bounds.MIN_X,
-        bounds.MAX_X
+        bounds.minX,
+        bounds.maxX
       );
       const newY = clamp(
         startY.value + event.translationY,
-        bounds.MIN_Y,
-        bounds.MAX_Y
+        bounds.minY,
+        bounds.maxY
       );
       
       position.x.value = newX;
       position.y.value = newY;
+      
+      if (onPositionChange) {
+        runOnJS(onPositionChange)();
+      }
     })
     .onEnd(() => {
       'worklet';

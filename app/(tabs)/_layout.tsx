@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Cable } from 'lucide-react-native';
+import { Home, Play, Trophy, Settings } from 'lucide-react-native';
 
 export default function TabLayout() {
   return (
@@ -7,15 +7,46 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#f8f9fa',
+          backgroundColor: '#1A1D29',
+          borderTopColor: '#2D3748',
+          borderTopWidth: 1,
         },
+        tabBarActiveTintColor: '#18FF92',
+        tabBarInactiveTintColor: '#64748B',
       }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Cables',
+          title: 'Home',
           tabBarIcon: ({ size, color }) => (
-            <Cable size={size} color={color} />
+            <Home size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="game"
+        options={{
+          title: 'Play',
+          tabBarIcon: ({ size, color }) => (
+            <Play size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="levels"
+        options={{
+          title: 'Levels',
+          tabBarIcon: ({ size, color }) => (
+            <Trophy size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          tabBarIcon: ({ size, color }) => (
+            <Settings size={size} color={color} />
           ),
         }}
       />

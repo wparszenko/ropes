@@ -1,116 +1,126 @@
 import React from 'react';
-import { View, StyleSheet, Dimensions, Platform } from 'react-native';
-import { Svg } from 'react-native-svg';
-import { useSharedValue } from 'react-native-reanimated';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import DraggableDot from '@/components/DraggableDot';
-import RopePath from '@/components/RopePath';
+import { View, Text, TouchableOpacity, ImageBackground, Dimensions } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Play, Trophy, Settings, Zap } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { useGameStore } from '@/store/gameStore';
 
 const { width, height } = Dimensions.get('window');
 
-// Game boundaries - adjusted for better web experience
-export const BOUNDS = {
-  MIN_X: 40,
-  MAX_X: width - 40,
-  MIN_Y: 150,
-  MAX_Y: height - 100,
-};
+export default function HomeScreen() {
+  const { playerStats, currentLevel } = useGameStore();
 
-export default function CableDemo() {
-  // Cable 1 (Red) - shared values for endpoints
-  const cable1Start = {
-    x: useSharedValue(80),
-    y: useSharedValue(200),
-  };
-  const cable1End = {
-    x: useSharedValue(280),
-    y: useSharedValue(350),
+  const handlePlayGame = () => {
+    router.push('/game');
   };
 
-  // Cable 2 (Blue) - shared values for endpoints
-  const cable2Start = {
-    x: useSharedValue(120),
-    y: useSharedValue(450),
-  };
-  const cable2End = {
-    x: useSharedValue(240),
-    y: useSharedValue(300),
+  const handleViewLevels = () => {
+    router.push('/levels');
   };
 
-  const containerContent = (
-    <View style={styles.container}>
-      {/* SVG Layer - Behind dots */}
-      <View style={styles.svgContainer}>
-        <Svg width={width} height={height} style={styles.svg}>
-          {/* Cable 1 - Red */}
-          <RopePath
-            startPoint={cable1Start}
-            endPoint={cable1End}
-            color="#E74C3C"
-          />
-          
-          {/* Cable 2 - Blue */}
-          <RopePath
-            startPoint={cable2Start}
-            endPoint={cable2End}
-            color="#3498DB"
-          />
-        </Svg>
-      </View>
-
-      {/* Dots Layer - Above SVG */}
-      <View style={styles.dotsContainer}>
-        {/* Draggable dots for Cable 1 */}
-        <DraggableDot position={cable1Start} />
-        <DraggableDot position={cable1End} />
-
-        {/* Draggable dots for Cable 2 */}
-        <DraggableDot position={cable2Start} />
-        <DraggableDot position={cable2End} />
-      </View>
-    </View>
-  );
-
-  // Wrap in GestureHandlerRootView only on native platforms
-  if (Platform.OS === 'web') {
-    return containerContent;
-  }
+  const handleSettings = () => {
+    router.push('/settings');
+  };
 
   return (
-    <GestureHandlerRootView style={styles.container}>
-      {containerContent}
-    </GestureHandlerRootView>
+    <View className="flex-1 bg-dark-bg">
+      <LinearGradient
+        colors={['#0F1117', '#1A1D29', '#0F1117']}
+        style={{ flex: 1 }}
+      >
+        {/* Header */}
+        <View className="pt-16 pb-8 px-6">
+          <View className="flex-row items-center justify-center mb-4">
+            <Zap size={32} color="#18FF92" />
+            <Text className="text-4xl font-bold text-white ml-2 font-orbitron">
+              TANGLE
+            </Text>
+          </View>
+          <Text className="text-2xl font-bold text-neon-green text-center font-orbitron">
+            ESCAPE
+          </Text>
+          <Text className="text-gray-400 text-center mt-2">
+            Connect the circuits, escape the maze
+          </Text>
+        </View>
+
+        {/* Stats Card */}
+        <View className="mx-6 mb-8 bg-dark-surface/80 rounded-2xl p-6 border border-dark-border">
+          <Text className="text-white text-lg font-bold mb-4 font-orbitron">
+            Progress
+          </Text>
+          <View className="flex-row justify-between">
+            <View className="items-center">
+              <Text className="text-neon-green text-2xl font-bold">
+                {currentLevel}
+              </Text>
+              <Text className="text-gray-400 text-sm">Level</Text>
+            </View>
+            <View className="items-center">
+              <Text className="text-neon-blue text-2xl font-bold">
+                {playerStats.totalStars}
+              </Text>
+              <Text className="text-gray-400 text-sm">Stars</Text>
+            </View>
+            <View className="items-center">
+              <Text className="text-neon-purple text-2xl font-bold">
+                {playerStats.completedLevels}
+              </Text>
+              <Text className="text-gray-400 text-sm">Completed</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Main Menu Buttons */}
+        <View className="flex-1 justify-center px-6 space-y-4">
+          <TouchableOpacity
+            onPress={handlePlayGame}
+            className="bg-neon-green/20 border-2 border-neon-green rounded-2xl p-6 items-center"
+            style={{
+              shadowColor: '#18FF92',
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 0.5,
+              shadowRadius: 10,
+              elevation: 10,
+            }}
+          >
+            <Play size={32} color="#18FF92" />
+            <Text className="text-white text-xl font-bold mt-2 font-orbitron">
+              CONTINUE GAME
+            </Text>
+            <Text className="text-gray-400 text-sm">
+              Level {currentLevel}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleViewLevels}
+            className="bg-neon-blue/20 border-2 border-neon-blue rounded-2xl p-4 flex-row items-center justify-center"
+          >
+            <Trophy size={24} color="#00E0FF" />
+            <Text className="text-white text-lg font-bold ml-3 font-orbitron">
+              LEVEL SELECT
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleSettings}
+            className="bg-dark-surface/80 border-2 border-dark-border rounded-2xl p-4 flex-row items-center justify-center"
+          >
+            <Settings size={24} color="#64748B" />
+            <Text className="text-gray-300 text-lg font-bold ml-3 font-orbitron">
+              SETTINGS
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Footer */}
+        <View className="pb-8 px-6">
+          <Text className="text-gray-500 text-center text-sm">
+            v1.0.0 • Made with ⚡ by Tangle Team
+          </Text>
+        </View>
+      </LinearGradient>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  svgContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1,
-    // Ensure SVG doesn't interfere with touch events
-    pointerEvents: 'none',
-  },
-  svg: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-  },
-  dotsContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 2,
-    // Allow touch events to pass through to dots
-    pointerEvents: 'box-none',
-  },
-});

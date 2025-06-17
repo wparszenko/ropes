@@ -107,7 +107,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     };
   }, [currentLevel, initializeLevel, isInitialized]);
 
-  // Update shared values when positions change with validation
+  // Performance optimization: Batch position updates and reduce frequency
   useEffect(() => {
     if (isInitialized && ropes.length > 0) {
       // Clear any pending position update
@@ -115,29 +115,36 @@ export default function GameBoard({ levelData }: GameBoardProps) {
         clearTimeout(positionUpdateTimeoutRef.current);
       }
 
-      // Batch position updates to prevent rapid changes
+      // Batch position updates with longer delay for better performance
       positionUpdateTimeoutRef.current = setTimeout(() => {
         // Validate positions first
         validatePositions();
         
+        // Update shared values in batches to reduce render cycles
+        const updates = [];
         ropes.forEach((rope, index) => {
           const position = ropePositions[rope.id];
           const shared = sharedValues[index];
           if (position && shared && index < MAX_ROPES) {
-            // Validate position values before setting - avoid reading during render
-            const startX = isNaN(position.startX) ? GAME_BOUNDS.minX + 50 : position.startX;
-            const startY = isNaN(position.startY) ? GAME_BOUNDS.minY + 50 : position.startY;
-            const endX = isNaN(position.endX) ? GAME_BOUNDS.maxX - 50 : position.endX;
-            const endY = isNaN(position.endY) ? GAME_BOUNDS.maxY - 50 : position.endY;
-            
-            // Set values outside of render cycle
-            shared.startX.value = startX;
-            shared.startY.value = startY;
-            shared.endX.value = endX;
-            shared.endY.value = endY;
+            updates.push({ position, shared, index });
           }
         });
-      }, 16); // ~60fps update rate
+        
+        // Apply all updates at once
+        updates.forEach(({ position, shared }) => {
+          // Validate position values before setting - avoid reading during render
+          const startX = isNaN(position.startX) ? GAME_BOUNDS.minX + 50 : position.startX;
+          const startY = isNaN(position.startY) ? GAME_BOUNDS.minY + 50 : position.startY;
+          const endX = isNaN(position.endX) ? GAME_BOUNDS.maxX - 50 : position.endX;
+          const endY = isNaN(position.endY) ? GAME_BOUNDS.maxY - 50 : position.endY;
+          
+          // Set values outside of render cycle
+          shared.startX.value = startX;
+          shared.startY.value = startY;
+          shared.endX.value = endX;
+          shared.endY.value = endY;
+        });
+      }, 32); // ~30fps update rate for better performance
     }
 
     return () => {
@@ -192,7 +199,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     };
   }, [cleanupLevel]);
 
-  // Enhanced position change handler with validation
+  // Performance optimized position change handler
   const handlePositionChange = useCallback((ropeId: string, endpoint: 'start' | 'end', sharedX: any, sharedY: any) => {
     // Use a callback to avoid reading shared values during render
     const updatePosition = () => {
@@ -207,8 +214,8 @@ export default function GameBoard({ levelData }: GameBoardProps) {
       updateRopePosition(ropeId, positionUpdate);
     };
     
-    // Defer the update to avoid reading during render
-    setTimeout(updatePosition, 0);
+    // Defer the update to avoid reading during render and batch updates
+    requestAnimationFrame(updatePosition);
   }, [updateRopePosition]);
 
   // Show loading state while initializing

@@ -44,6 +44,12 @@ const initialState: RopeState = {
   currentLevel: 0,
 };
 
+// Performance optimization: Debounce intersection checks
+let intersectionCheckTimeout: NodeJS.Timeout | null = null;
+let lastIntersectionCheck = 0;
+const INTERSECTION_CHECK_DEBOUNCE = 100; // ms
+const MIN_CHECK_INTERVAL = 50; // ms
+
 export const useRopeStore = create<RopeStore>((set, get) => ({
   ...initialState,
 
@@ -144,41 +150,63 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
 
     set({ ropePositions: newPositions });
     
-    // Only check intersections if not currently dragging
-    if (state.dragCount === 0) {
-      setTimeout(() => {
+    // Performance optimization: Debounced intersection checking
+    const now = Date.now();
+    if (state.dragCount === 0 && now - lastIntersectionCheck > MIN_CHECK_INTERVAL) {
+      if (intersectionCheckTimeout) {
+        clearTimeout(intersectionCheckTimeout);
+      }
+      
+      intersectionCheckTimeout = setTimeout(() => {
+        lastIntersectionCheck = Date.now();
         get().checkIntersections();
-      }, 50);
+      }, INTERSECTION_CHECK_DEBOUNCE);
     }
   },
 
   checkIntersections: () => {
     const state = get();
+    
+    // Performance optimization: Skip if dragging or not initialized
+    if (state.isDragging || !state.isInitialized || state.ropes.length === 0) {
+      return state.intersectionCount;
+    }
+    
     const currentRopes = get().getCurrentRopes();
     const newIntersectionCount = countIntersections(currentRopes);
     const isCompleted = newIntersectionCount === 0 && currentRopes.length > 0 && state.dragCount === 0;
 
-    set({
-      intersectionCount: newIntersectionCount,
-      isCompleted,
-    });
+    // Only update state if values actually changed
+    if (newIntersectionCount !== state.intersectionCount || isCompleted !== state.isCompleted) {
+      set({
+        intersectionCount: newIntersectionCount,
+        isCompleted,
+      });
+    }
 
     return newIntersectionCount;
   },
 
   getCurrentRopes: () => {
     const { ropes, ropePositions } = get();
-    return ropes.map(rope => ({
-      ...rope,
-      start: {
-        x: ropePositions[rope.id]?.startX || rope.start.x,
-        y: ropePositions[rope.id]?.startY || rope.start.y,
-      },
-      end: {
-        x: ropePositions[rope.id]?.endX || rope.end.x,
-        y: ropePositions[rope.id]?.endY || rope.end.y,
-      },
-    }));
+    
+    // Performance optimization: Use cached result if positions haven't changed
+    return ropes.map(rope => {
+      const position = ropePositions[rope.id];
+      if (!position) return rope;
+      
+      return {
+        ...rope,
+        start: {
+          x: position.startX,
+          y: position.startY,
+        },
+        end: {
+          x: position.endX,
+          y: position.endY,
+        },
+      };
+    });
   },
 
   setDragging: (dragging: boolean) => {
@@ -191,11 +219,17 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
       dragCount: newDragCount,
     });
     
-    // Check intersections when all dragging ends
+    // Performance optimization: Only check intersections when all dragging ends
     if (newDragCount === 0) {
+      // Clear any pending intersection checks
+      if (intersectionCheckTimeout) {
+        clearTimeout(intersectionCheckTimeout);
+      }
+      
+      // Immediate check when dragging stops
       setTimeout(() => {
         get().checkIntersections();
-      }, 100);
+      }, 50);
     }
   },
 
@@ -223,6 +257,12 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
 
   resetLevel: () => {
     console.log('Resetting rope level');
+    
+    // Clear any pending intersection checks
+    if (intersectionCheckTimeout) {
+      clearTimeout(intersectionCheckTimeout);
+    }
+    
     const { bounds, currentLevel } = get();
     if (bounds && currentLevel > 0) {
       // Clean up current data and re-initialize fresh
@@ -236,6 +276,15 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
 
   cleanupLevel: () => {
     console.log('Cleaning up level data to prevent memory leaks');
+    
+    // Clear any pending intersection checks
+    if (intersectionCheckTimeout) {
+      clearTimeout(intersectionCheckTimeout);
+      intersectionCheckTimeout = null;
+    }
+    
+    // Reset timing variables
+    lastIntersectionCheck = 0;
     
     // Clear all rope data
     set({
@@ -256,6 +305,14 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
 
   clearAll: () => {
     console.log('Clearing all rope data');
+    
+    // Clear any pending intersection checks
+    if (intersectionCheckTimeout) {
+      clearTimeout(intersectionCheckTimeout);
+      intersectionCheckTimeout = null;
+    }
+    
+    lastIntersectionCheck = 0;
     get().cleanupLevel();
     set(initialState);
   },

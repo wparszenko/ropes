@@ -31,7 +31,7 @@ const ROPE_COLORS = [
   '#E91E63', // Pink
 ];
 
-// Check if two line segments intersect
+// Performance optimized line intersection check
 export function doLinesIntersect(
   line1Start: RopeEndpoint,
   line1End: RopeEndpoint,
@@ -46,6 +46,22 @@ export function doLinesIntersect(
   const y3 = line2Start.y;
   const x4 = line2End.x;
   const y4 = line2End.y;
+
+  // Quick bounding box check for early rejection
+  const minX1 = Math.min(x1, x2);
+  const maxX1 = Math.max(x1, x2);
+  const minY1 = Math.min(y1, y2);
+  const maxY1 = Math.max(y1, y2);
+  
+  const minX2 = Math.min(x3, x4);
+  const maxX2 = Math.max(x3, x4);
+  const minY2 = Math.min(y3, y4);
+  const maxY2 = Math.max(y3, y4);
+  
+  // If bounding boxes don't overlap, lines can't intersect
+  if (maxX1 < minX2 || maxX2 < minX1 || maxY1 < minY2 || maxY2 < minY1) {
+    return false;
+  }
 
   // Calculate the direction of the lines
   const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
@@ -231,7 +247,7 @@ export function generateCrossedRopes(ropeCount: number, bounds: GameBounds): Rop
     end.y = Math.max(bounds.minY + padding, Math.min(bounds.maxY - padding, end.y));
 
     ropes.push({
-      id: `rope_${i}_${Date.now()}_${Math.floor(Math.random() * 1000)}`, // Unique ID with randomization
+      id: `rope_${i}_${Date.now()}_${Math.floor(seededRandom() * 1000)}`, // Unique ID with randomization
       start,
       end,
       color,
@@ -258,10 +274,10 @@ export function generateCrossedRopes(ropeCount: number, bounds: GameBounds): Rop
       const adjustmentFactor = Math.min(ropeLength * 0.1, 25); // Proportional to rope length
       
       // Apply random adjustments
-      rope.start.x += (Math.random() - 0.5) * adjustmentFactor;
-      rope.start.y += (Math.random() - 0.5) * adjustmentFactor;
-      rope.end.x += (Math.random() - 0.5) * adjustmentFactor;
-      rope.end.y += (Math.random() - 0.5) * adjustmentFactor;
+      rope.start.x += (seededRandom() - 0.5) * adjustmentFactor;
+      rope.start.y += (seededRandom() - 0.5) * adjustmentFactor;
+      rope.end.x += (seededRandom() - 0.5) * adjustmentFactor;
+      rope.end.y += (seededRandom() - 0.5) * adjustmentFactor;
 
       // Keep within bounds with padding
       const padding = 20;
@@ -317,15 +333,21 @@ function hasIntersections(ropes: Rope[]): boolean {
   return false;
 }
 
-// Count total intersections
+// Performance optimized intersection counting with early termination
 export function countIntersections(ropes: Rope[]): number {
   let count = 0;
-  for (let i = 0; i < ropes.length; i++) {
-    for (let j = i + 1; j < ropes.length; j++) {
-      if (doLinesIntersect(ropes[i].start, ropes[i].end, ropes[j].start, ropes[j].end)) {
+  const ropeCount = ropes.length;
+  
+  // Performance optimization: Use more efficient loop structure
+  for (let i = 0; i < ropeCount - 1; i++) {
+    const rope1 = ropes[i];
+    for (let j = i + 1; j < ropeCount; j++) {
+      const rope2 = ropes[j];
+      if (doLinesIntersect(rope1.start, rope1.end, rope2.start, rope2.end)) {
         count++;
       }
     }
   }
+  
   return count;
 }

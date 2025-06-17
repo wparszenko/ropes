@@ -54,13 +54,26 @@ export default function DraggableDot({
   const lastValidX = useSharedValue(position.x.value);
   const lastValidY = useSharedValue(position.y.value);
   
+  // Performance optimization: Throttle position change callbacks
+  const lastCallbackTime = useRef(0);
+  const CALLBACK_THROTTLE = 16; // ~60fps
+  
+  const throttledPositionChange = () => {
+    const now = Date.now();
+    if (now - lastCallbackTime.current > CALLBACK_THROTTLE) {
+      lastCallbackTime.current = now;
+      if (onPositionChange) {
+        onPositionChange();
+      }
+    }
+  };
+  
   // Web-specific pan responder
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponderCapture: () => true,
       onPanResponderGrant: (evt) => {
-        'worklet';
         startX.value = position.x.value;
         startY.value = position.y.value;
         lastValidX.value = position.x.value;
@@ -70,7 +83,6 @@ export default function DraggableDot({
         setDragging(true);
       },
       onPanResponderMove: (evt, gestureState) => {
-        'worklet';
         const newX = clamp(
           startX.value + gestureState.dx,
           bounds.minX,
@@ -88,12 +100,9 @@ export default function DraggableDot({
         lastValidX.value = newX;
         lastValidY.value = newY;
         
-        if (onPositionChange) {
-          onPositionChange();
-        }
+        throttledPositionChange();
       },
       onPanResponderRelease: () => {
-        'worklet';
         isDragging.value = false;
         isPressed.value = false;
         
@@ -122,7 +131,6 @@ export default function DraggableDot({
         }
       },
       onPanResponderTerminate: () => {
-        'worklet';
         // Handle gesture termination - restore to last valid position
         isDragging.value = false;
         isPressed.value = false;
@@ -147,7 +155,7 @@ export default function DraggableDot({
     })
   ).current;
 
-  // Enhanced native gesture handler with better iOS support
+  // Enhanced native gesture handler with better iOS support and performance optimization
   const panGesture = Gesture.Pan()
     .onBegin(() => {
       'worklet';
@@ -180,9 +188,8 @@ export default function DraggableDot({
         lastValidX.value = newX;
         lastValidY.value = newY;
         
-        if (onPositionChange) {
-          runOnJS(onPositionChange)();
-        }
+        // Throttle callback for performance
+        runOnJS(throttledPositionChange)();
       }
     })
     .onEnd(() => {

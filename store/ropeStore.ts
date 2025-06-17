@@ -16,7 +16,7 @@ export interface RopeState {
   bounds: GameBounds | null;
   isDragging: boolean;
   isInitialized: boolean;
-  dragCount: number;
+  dragCount: number; // Track number of active drags
 }
 
 interface RopeStore extends RopeState {
@@ -27,7 +27,7 @@ interface RopeStore extends RopeState {
   getCurrentRopes: () => Rope[];
   setDragging: (dragging: boolean) => void;
   clearAll: () => void;
-  validatePositions: () => void;
+  validatePositions: () => void; // Add position validation
 }
 
 const initialState: RopeState = {
@@ -130,11 +130,11 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
 
     set({ ropePositions: newPositions });
     
-    // Reduced frequency of intersection checks during dragging
+    // Only check intersections if not currently dragging
     if (state.dragCount === 0) {
       setTimeout(() => {
         get().checkIntersections();
-      }, 100); // Increased delay to reduce CPU usage
+      }, 50); // Small delay to batch updates
     }
   },
 
@@ -177,11 +177,11 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
       dragCount: newDragCount,
     });
     
-    // Check intersections when all dragging ends with increased delay
+    // Check intersections when all dragging ends
     if (newDragCount === 0) {
       setTimeout(() => {
         get().checkIntersections();
-      }, 200); // Increased delay to reduce CPU usage
+      }, 100); // Small delay to ensure position updates are complete
     }
   },
 

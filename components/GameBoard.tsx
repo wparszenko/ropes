@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useMemo } from 'react';
 import { View, StyleSheet, Dimensions, Platform, Text } from 'react-native';
 import { Svg } from 'react-native-svg';
 import { useSharedValue } from 'react-native-reanimated';
@@ -44,6 +44,37 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     checkIntersections 
   } = useRopeStore();
 
+  // Create all shared values at the top level to maintain hook order
+  const sharedValues = useMemo(() => {
+    const values: { [ropeId: string]: any } = {};
+    ropes.forEach(rope => {
+      const position = ropePositions[rope.id];
+      if (position) {
+        values[rope.id] = {
+          startX: useSharedValue(position.startX),
+          startY: useSharedValue(position.startY),
+          endX: useSharedValue(position.endX),
+          endY: useSharedValue(position.endY),
+        };
+      }
+    });
+    return values;
+  }, [ropes.length]); // Only recreate when rope count changes
+
+  // Update shared values when positions change
+  useEffect(() => {
+    ropes.forEach(rope => {
+      const position = ropePositions[rope.id];
+      const shared = sharedValues[rope.id];
+      if (position && shared) {
+        shared.startX.value = position.startX;
+        shared.startY.value = position.startY;
+        shared.endX.value = position.endX;
+        shared.endY.value = position.endY;
+      }
+    });
+  }, [ropePositions, sharedValues, ropes]);
+
   // Initialize level when component mounts or level changes
   useEffect(() => {
     initializeLevel(currentLevel, GAME_BOUNDS);
@@ -59,19 +90,6 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     }
   }, [isCompleted, ropes.length, currentLevel, completeLevel]);
 
-  // Create shared values for each rope endpoint
-  const createSharedValues = useCallback((ropeId: string) => {
-    const position = ropePositions[ropeId];
-    if (!position) return null;
-
-    return {
-      startX: useSharedValue(position.startX),
-      startY: useSharedValue(position.startY),
-      endX: useSharedValue(position.endX),
-      endY: useSharedValue(position.endY),
-    };
-  }, [ropePositions]);
-
   // Handle rope position updates
   const handlePositionChange = useCallback((ropeId: string, endpoint: 'start' | 'end', x: number, y: number) => {
     const positionUpdate = endpoint === 'start' 
@@ -81,6 +99,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     updateRopePosition(ropeId, positionUpdate);
   }, [updateRopePosition]);
 
+  // Early return after all hooks have been called
   if (ropes.length === 0) {
     return (
       <View style={[styles.container, { height: BOARD_HEIGHT }]}>
@@ -97,17 +116,14 @@ export default function GameBoard({ levelData }: GameBoardProps) {
       <View style={styles.svgContainer}>
         <Svg width={BOARD_WIDTH} height={BOARD_HEIGHT} style={styles.svg}>
           {ropes.map(rope => {
-            const position = ropePositions[rope.id];
-            if (!position) return null;
-            
-            const sharedValues = createSharedValues(rope.id);
-            if (!sharedValues) return null;
+            const shared = sharedValues[rope.id];
+            if (!shared) return null;
             
             return (
               <RopePath
                 key={rope.id}
-                startPoint={{ x: sharedValues.startX, y: sharedValues.startY }}
-                endPoint={{ x: sharedValues.endX, y: sharedValues.endY }}
+                startPoint={{ x: shared.startX, y: shared.startY }}
+                endPoint={{ x: shared.endX, y: shared.endY }}
                 color={rope.color}
               />
             );
@@ -118,37 +134,34 @@ export default function GameBoard({ levelData }: GameBoardProps) {
       {/* Dots Layer - Above SVG */}
       <View style={styles.dotsContainer}>
         {ropes.map(rope => {
-          const position = ropePositions[rope.id];
-          if (!position) return null;
-
-          const sharedValues = createSharedValues(rope.id);
-          if (!sharedValues) return null;
+          const shared = sharedValues[rope.id];
+          if (!shared) return null;
 
           return (
             <React.Fragment key={rope.id}>
               <DraggableDot 
-                position={{ x: sharedValues.startX, y: sharedValues.startY }}
+                position={{ x: shared.startX, y: shared.startY }}
                 color={rope.color}
                 bounds={GAME_BOUNDS}
                 onPositionChange={() => {
                   handlePositionChange(
                     rope.id, 
                     'start', 
-                    sharedValues.startX.value, 
-                    sharedValues.startY.value
+                    shared.startX.value, 
+                    shared.startY.value
                   );
                 }}
               />
               <DraggableDot 
-                position={{ x: sharedValues.endX, y: sharedValues.endY }}
+                position={{ x: shared.endX, y: shared.endY }}
                 color={rope.color}
                 bounds={GAME_BOUNDS}
                 onPositionChange={() => {
                   handlePositionChange(
                     rope.id, 
                     'end', 
-                    sharedValues.endX.value, 
-                    sharedValues.endY.value
+                    shared.endX.value, 
+                    shared.endY.value
                   );
                 }}
               />

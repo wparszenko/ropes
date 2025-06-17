@@ -60,7 +60,7 @@ export default function RopePath({ startPoint, endPoint, color }: RopePathProps)
         strokeLinecap="round"
         strokeLinejoin="round"
         opacity={0.9}
-        style={{ pointerEvents: 'none' }}
+        pointerEvents="none"
       />
     );
   }

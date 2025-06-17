@@ -170,17 +170,6 @@ export default function GameBoard({ levelData }: GameBoardProps) {
 
       {/* Visual boundary indicator */}
       <View style={gameBoardStyles.boundaryIndicator} />
-      
-      {/* Intersection counter for debugging */}
-      {__DEV__ && (
-        <View style={gameBoardStyles.debugInfo}>
-          <View style={gameBoardStyles.debugText}>
-            <Text style={gameBoardStyles.debugLabel}>Intersections: {intersectionCount}</Text>
-            <Text style={gameBoardStyles.debugLabel}>Ropes: {ropes.length}</Text>
-            <Text style={gameBoardStyles.debugLabel}>Completed: {isCompleted ? 'Yes' : 'No'}</Text>
-          </View>
-        </View>
-      )}
     </View>
   );
 

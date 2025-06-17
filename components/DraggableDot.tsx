@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Platform } from 'react-native';
+import { StyleSheet, Platform, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   withSpring,
@@ -94,6 +94,15 @@ export default function DraggableDot({
     };
   });
 
+  // For web compatibility, wrap in a simple View if gesture handler fails
+  if (Platform.OS === 'web') {
+    return (
+      <View style={[styles.dotContainer, animatedStyle]}>
+        <View style={[styles.dot, { backgroundColor: color }]} />
+      </View>
+    );
+  }
+
   return (
     <GestureDetector gesture={panGesture}>
       <Animated.View 
@@ -108,6 +117,11 @@ export default function DraggableDot({
 }
 
 const styles = StyleSheet.create({
+  dotContainer: {
+    position: 'absolute',
+    width: 30,
+    height: 30,
+  },
   dot: {
     position: 'absolute',
     width: 30,

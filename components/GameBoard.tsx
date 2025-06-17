@@ -108,9 +108,13 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     </View>
   );
 
-  // Wrap in GestureHandlerRootView only on native platforms
+  // For web compatibility, don't wrap in GestureHandlerRootView
   if (Platform.OS === 'web') {
-    return containerContent;
+    return (
+      <View style={styles.wrapper}>
+        {containerContent}
+      </View>
+    );
   }
 
   return (

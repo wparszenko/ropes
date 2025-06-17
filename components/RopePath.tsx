@@ -20,10 +20,19 @@ interface RopePathProps {
 
 export default function RopePath({ startPoint, endPoint, color }: RopePathProps) {
   const animatedProps = useAnimatedProps(() => {
-    const startX = startPoint.x.value;
-    const startY = startPoint.y.value;
-    const endX = endPoint.x.value;
-    const endY = endPoint.y.value;
+    // Ensure we have valid numbers
+    const startX = startPoint.x.value || 0;
+    const startY = startPoint.y.value || 0;
+    const endX = endPoint.x.value || 0;
+    const endY = endPoint.y.value || 0;
+
+    // Validate that all values are numbers
+    if (isNaN(startX) || isNaN(startY) || isNaN(endX) || isNaN(endY)) {
+      // Return a simple line if values are invalid
+      return {
+        d: `M 50 50 L 100 100`,
+      };
+    }
 
     // Calculate distance between points for dynamic arc
     const distance = Math.sqrt(

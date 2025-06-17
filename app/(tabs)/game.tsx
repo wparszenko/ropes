@@ -76,6 +76,9 @@ export default function GameScreen() {
     resetLevel: resetRopeLevel, 
     ropes, 
     intersectionCount,
+    isCompleted,
+    isDragging,
+    isInitialized,
     cleanupLevel, // New cleanup method
     currentLevel: ropeCurrentLevel 
   } = useRopeStore();
@@ -151,6 +154,7 @@ export default function GameScreen() {
     setShowCompleteModal(false);
     setShowFailedModal(false);
     modalClosingRef.current = false;
+    completionTriggeredRef.current = false;
     
     // Reset timer to 30 seconds for new level
     setTimeRemaining(30);
@@ -183,29 +187,62 @@ export default function GameScreen() {
     }
   }, [levelState, ropes.length, currentLevel, startLevel]);
 
-  // Handle level completion with new star system
+  // Handle level completion - check for rope completion and show modal
   useEffect(() => {
     if (
-      levelState === 'completed' && 
+      isCompleted && 
       ropes.length > 0 && 
       !completionTriggeredRef.current && 
-      gameState === 'playing' &&
+      levelState === 'playing' &&
       !isDragging &&
-      isInitialized
+      isInitialized &&
+      !showCompleteModal &&
+      !modalClosingRef.current &&
+      modalShownForLevel.current !== currentLevel
     ) {
+      console.log('Level completed! Showing completion modal');
       completionTriggeredRef.current = true;
       
-      setTimeout(() => {
-        // Calculate stars based on performance
-        const baseStars = 1;
-        const timeBonus = intersectionCount === 0 ? 1 : 0; // Bonus for perfect solution
-        const efficiencyBonus = currentLevel <= 3 ? 1 : currentLevel <= 6 ? 2 : 3; // Progressive bonus
-        
-        const totalStars = Math.min(baseStars + timeBonus + efficiencyBonus, 4); // Max 4 stars
-        completeLevel(totalStars);
-      }, 300); // Reduced delay for better responsiveness
+      // Stop timer immediately on completion
+      gameTimerRef.current?.stop();
+
+      const timeElapsed = 30 - timeRemaining;
+      setCompletionTime(timeElapsed);
+      
+      // Calculate stars based on completion time
+      let earnedStars = 0;
+      if (timeElapsed <= 5) {
+        earnedStars = 3; // 3 stars for completion in 5 seconds or less
+      } else if (timeElapsed <= 10) {
+        earnedStars = 2; // 2 stars for completion in 10 seconds or less
+      } else if (timeElapsed <= 20) {
+        earnedStars = 1; // 1 star for completion in 20 seconds or less
+      } else {
+        earnedStars = 0; // No stars for completion over 20 seconds
+      }
+      
+      setModalStars(earnedStars);
+      
+      // Complete the level in the game store
+      completeLevel(earnedStars);
+      
+      // Show modal
+      setShowCompleteModal(true);
+      modalShownForLevel.current = currentLevel;
     }
-  }, [levelState, ropes.length, currentLevel, completeLevel, intersectionCount, gameState]);
+  }, [
+    isCompleted, 
+    ropes.length, 
+    currentLevel, 
+    levelState, 
+    isDragging, 
+    isInitialized, 
+    showCompleteModal, 
+    modalClosingRef.current, 
+    modalShownForLevel.current, 
+    timeRemaining, 
+    completeLevel
+  ]);
 
   // Handle level failure - only show when actually failed and stop timer
   useEffect(() => {
@@ -250,6 +287,7 @@ export default function GameScreen() {
     setShowCompleteModal(false);
     setShowFailedModal(false);
     modalShownForLevel.current = null;
+    completionTriggeredRef.current = false;
     
     // Clean up current rope data before reset
     cleanupLevel();
@@ -285,6 +323,7 @@ export default function GameScreen() {
     modalClosingRef.current = true;
     setShowCompleteModal(false);
     modalShownForLevel.current = null;
+    completionTriggeredRef.current = false;
     
     // Clean up current level data before moving to next
     cleanupLevel();
@@ -302,6 +341,7 @@ export default function GameScreen() {
     setShowCompleteModal(false);
     setShowFailedModal(false);
     modalShownForLevel.current = null;
+    completionTriggeredRef.current = false;
     
     // Reset the closing flag after a delay
     setTimeout(() => {

@@ -1,12 +1,10 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Dimensions, StyleSheet, Platform } from 'react-native';
 import { Svg } from 'react-native-svg';
-import { useSharedValue } from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { LevelData } from '@/data/levels';
 import { useGameStore } from '@/store/gameStore';
-import DraggableDot from '@/components/DraggableDot';
-import RopePath from '@/components/RopePath';
+import WireComponent from '@/components/WireComponent';
 
 const { width, height } = Dimensions.get('window');
 const BOARD_HEIGHT = height - 300;
@@ -23,17 +21,9 @@ interface GameBoardProps {
   levelData: LevelData | null;
 }
 
-interface RopeEndpoints {
-  [key: string]: {
-    start: {
-      x: Animated.SharedValue<number>;
-      y: Animated.SharedValue<number>;
-    };
-    end: {
-      x: Animated.SharedValue<number>;
-      y: Animated.SharedValue<number>;
-    };
-  };
+interface WirePosition {
+  start: { x: number; y: number };
+  end: { x: number; y: number };
 }
 
 // Function to check if two line segments intersect
@@ -43,8 +33,6 @@ const doLinesIntersect = (
   line2Start: { x: number; y: number },
   line2End: { x: number; y: number }
 ): boolean => {
-  'worklet';
-  
   const { x: x1, y: y1 } = line1Start;
   const { x: x2, y: y2 } = line1End;
   const { x: x3, y: y3 } = line2Start;
@@ -61,62 +49,31 @@ const doLinesIntersect = (
 };
 
 export default function GameBoard({ levelData }: GameBoardProps) {
-  // Always call hooks at the top level, regardless of levelData
   const { completeLevel, activatePortal } = useGameStore();
   const [hasIntersections, setHasIntersections] = useState(true);
+  const wirePositionsRef = useRef<Record<string, WirePosition>>({});
 
-  // Create rope endpoints using useMemo to ensure hooks are called at top level
-  const ropeEndpoints = useMemo<RopeEndpoints>(() => {
-    if (!levelData) return {};
-    
-    const endpoints: RopeEndpoints = {};
-    
-    levelData.wires.forEach((wire) => {
-      endpoints[wire.id] = {
-        start: {
-          x: useSharedValue(wire.start[0]),
-          y: useSharedValue(wire.start[1]),
-        },
-        end: {
-          x: useSharedValue(wire.end[0]),
-          y: useSharedValue(wire.end[1]),
-        },
-      };
-    });
-    
-    return endpoints;
-  }, [levelData]);
+  const handleWirePositionUpdate = useCallback((wireId: string, start: { x: number; y: number }, end: { x: number; y: number }) => {
+    wirePositionsRef.current[wireId] = { start, end };
+    checkIntersections();
+  }, []);
 
   // Check for rope intersections
   const checkIntersections = useCallback(() => {
-    if (!levelData || Object.keys(ropeEndpoints).length === 0) return;
+    if (!levelData) return;
 
-    const ropes = levelData.wires.map(wire => {
-      const endpoints = ropeEndpoints[wire.id];
-      if (!endpoints) return null;
-      
-      return {
-        id: wire.id,
-        start: {
-          x: endpoints.start.x.value,
-          y: endpoints.start.y.value,
-        },
-        end: {
-          x: endpoints.end.x.value,
-          y: endpoints.end.y.value,
-        },
-      };
-    }).filter(Boolean);
+    const wirePositions = Object.values(wirePositionsRef.current);
+    if (wirePositions.length === 0) return;
 
     let foundIntersection = false;
 
-    // Check all pairs of ropes for intersections
-    for (let i = 0; i < ropes.length; i++) {
-      for (let j = i + 1; j < ropes.length; j++) {
-        const rope1 = ropes[i];
-        const rope2 = ropes[j];
+    // Check all pairs of wires for intersections
+    for (let i = 0; i < wirePositions.length; i++) {
+      for (let j = i + 1; j < wirePositions.length; j++) {
+        const wire1 = wirePositions[i];
+        const wire2 = wirePositions[j];
         
-        if (rope1 && rope2 && doLinesIntersect(rope1.start, rope1.end, rope2.start, rope2.end)) {
+        if (doLinesIntersect(wire1.start, wire1.end, wire2.start, wire2.end)) {
           foundIntersection = true;
           break;
         }
@@ -133,13 +90,21 @@ export default function GameBoard({ levelData }: GameBoardProps) {
         completeLevel(3);
       }, 1000);
     }
-  }, [levelData, ropeEndpoints, activatePortal, completeLevel]);
+  }, [levelData, activatePortal, completeLevel]);
 
-  // Set up intersection checking with a slight delay to avoid excessive calculations
+  // Initialize wire positions when levelData changes
   useEffect(() => {
-    const timer = setTimeout(checkIntersections, 100);
-    return () => clearTimeout(timer);
-  }, [ropeEndpoints, checkIntersections]);
+    if (levelData) {
+      const initialPositions: Record<string, WirePosition> = {};
+      levelData.wires.forEach((wire) => {
+        initialPositions[wire.id] = {
+          start: { x: wire.start[0], y: wire.start[1] },
+          end: { x: wire.end[0], y: wire.end[1] },
+        };
+      });
+      wirePositionsRef.current = initialPositions;
+    }
+  }, [levelData]);
 
   // Early return after all hooks are called
   if (!levelData) {
@@ -157,44 +122,26 @@ export default function GameBoard({ levelData }: GameBoardProps) {
       {/* SVG Layer - Behind dots */}
       <View style={styles.svgContainer}>
         <Svg width={width - 32} height={BOARD_HEIGHT} style={styles.svg}>
-          {/* Render ropes */}
-          {levelData.wires.map((wire) => {
-            const endpoints = ropeEndpoints[wire.id];
-            if (!endpoints) return null;
-
-            return (
-              <RopePath
-                key={wire.id}
-                startPoint={endpoints.start}
-                endPoint={endpoints.end}
-                color={wire.color}
-              />
-            );
-          })}
+          {/* Render wires */}
+          {levelData.wires.map((wire) => (
+            <WireComponent
+              key={wire.id}
+              wire={wire}
+              onPositionUpdate={handleWirePositionUpdate}
+            />
+          ))}
         </Svg>
       </View>
 
       {/* Dots Layer - Above SVG */}
       <View style={styles.dotsContainer}>
-        {levelData.wires.map((wire) => {
-          const endpoints = ropeEndpoints[wire.id];
-          if (!endpoints) return null;
-
-          return (
-            <React.Fragment key={wire.id}>
-              <DraggableDot 
-                position={endpoints.start} 
-                color={wire.color}
-                onPositionChange={checkIntersections}
-              />
-              <DraggableDot 
-                position={endpoints.end} 
-                color={wire.color}
-                onPositionChange={checkIntersections}
-              />
-            </React.Fragment>
-          );
-        })}
+        {levelData.wires.map((wire) => (
+          <WireComponent
+            key={`dots-${wire.id}`}
+            wire={wire}
+            onPositionUpdate={handleWirePositionUpdate}
+          />
+        ))}
       </View>
 
       {/* Success Portal */}

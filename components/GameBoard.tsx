@@ -63,38 +63,35 @@ const doLinesIntersect = (
 export default function GameBoard({ levelData }: GameBoardProps) {
   // Always call hooks at the top level, regardless of levelData
   const { completeLevel, activatePortal } = useGameStore();
-  const [ropeEndpoints, setRopeEndpoints] = useState<RopeEndpoints>({});
   const [hasIntersections, setHasIntersections] = useState(true);
 
-  const memoizedLevelData = useMemo(() => levelData, [levelData]);
-
-  // Initialize rope endpoints with shared values
-  useEffect(() => {
-    if (memoizedLevelData) {
-      const endpoints: RopeEndpoints = {};
-      
-      memoizedLevelData.wires.forEach((wire) => {
-        endpoints[wire.id] = {
-          start: {
-            x: useSharedValue(wire.start[0]),
-            y: useSharedValue(wire.start[1]),
-          },
-          end: {
-            x: useSharedValue(wire.end[0]),
-            y: useSharedValue(wire.end[1]),
-          },
-        };
-      });
-      
-      setRopeEndpoints(endpoints);
-    }
-  }, [memoizedLevelData]);
+  // Create rope endpoints using useMemo to ensure hooks are called at top level
+  const ropeEndpoints = useMemo<RopeEndpoints>(() => {
+    if (!levelData) return {};
+    
+    const endpoints: RopeEndpoints = {};
+    
+    levelData.wires.forEach((wire) => {
+      endpoints[wire.id] = {
+        start: {
+          x: useSharedValue(wire.start[0]),
+          y: useSharedValue(wire.start[1]),
+        },
+        end: {
+          x: useSharedValue(wire.end[0]),
+          y: useSharedValue(wire.end[1]),
+        },
+      };
+    });
+    
+    return endpoints;
+  }, [levelData]);
 
   // Check for rope intersections
   const checkIntersections = useCallback(() => {
-    if (!memoizedLevelData || Object.keys(ropeEndpoints).length === 0) return;
+    if (!levelData || Object.keys(ropeEndpoints).length === 0) return;
 
-    const ropes = memoizedLevelData.wires.map(wire => {
+    const ropes = levelData.wires.map(wire => {
       const endpoints = ropeEndpoints[wire.id];
       if (!endpoints) return null;
       
@@ -130,13 +127,13 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     setHasIntersections(foundIntersection);
 
     // Complete level when no intersections
-    if (!foundIntersection && memoizedLevelData.goals.connectAll) {
+    if (!foundIntersection && levelData.goals.connectAll) {
       activatePortal();
       setTimeout(() => {
         completeLevel(3);
       }, 1000);
     }
-  }, [memoizedLevelData, ropeEndpoints, activatePortal, completeLevel]);
+  }, [levelData, ropeEndpoints, activatePortal, completeLevel]);
 
   // Set up intersection checking with a slight delay to avoid excessive calculations
   useEffect(() => {
@@ -145,7 +142,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
   }, [ropeEndpoints, checkIntersections]);
 
   // Early return after all hooks are called
-  if (!memoizedLevelData) {
+  if (!levelData) {
     return (
       <GestureHandlerRootView style={styles.container}>
         <View style={styles.gameBoard}>
@@ -161,7 +158,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
       <View style={styles.svgContainer}>
         <Svg width={width - 32} height={BOARD_HEIGHT} style={styles.svg}>
           {/* Render ropes */}
-          {memoizedLevelData.wires.map((wire) => {
+          {levelData.wires.map((wire) => {
             const endpoints = ropeEndpoints[wire.id];
             if (!endpoints) return null;
 
@@ -179,7 +176,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
 
       {/* Dots Layer - Above SVG */}
       <View style={styles.dotsContainer}>
-        {memoizedLevelData.wires.map((wire) => {
+        {levelData.wires.map((wire) => {
           const endpoints = ropeEndpoints[wire.id];
           if (!endpoints) return null;
 
@@ -214,8 +211,8 @@ export default function GameBoard({ levelData }: GameBoardProps) {
         style={[
           styles.robot,
           {
-            left: memoizedLevelData.robotStart[0] - 15,
-            top: memoizedLevelData.robotStart[1] - 15,
+            left: levelData.robotStart[0] - 15,
+            top: levelData.robotStart[1] - 15,
           },
         ]}
       >
@@ -241,12 +238,6 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     </GestureHandlerRootView>
   );
 }
-
-// Create shared values outside of the component to avoid hook issues
-const createSharedValues = (x: number, y: number) => ({
-  x: useSharedValue(x),
-  y: useSharedValue(y),
-});
 
 const styles = StyleSheet.create({
   container: {

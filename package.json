@@ -4,9 +4,11 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "EXPO_NO_TELEMETRY=1 expo start",
+    "dev": "EXPO_NO_TELEMETRY=1 expo start --clear",
     "build:web": "expo export --platform web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "start": "expo start --clear",
+    "reset": "expo start --clear --reset-cache"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, Dimensions, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Dimensions, Alert, AppState } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, RotateCcw, Lightbulb, Chrome as Home, Clock } from 'lucide-react-native';
 import { router } from 'expo-router';
@@ -12,12 +12,13 @@ import { gameScreenStyles } from '@/styles/gameScreenStyles';
 
 const { width, height } = Dimensions.get('window');
 
-// Timer class for better instance management
+// Enhanced timer class with better memory management
 class GameTimer {
   private intervalId: NodeJS.Timeout | null = null;
   private isRunning: boolean = false;
   private onTick: () => void;
   private onComplete: () => void;
+  private isDestroyed: boolean = false;
 
   constructor(onTick: () => void, onComplete: () => void) {
     this.onTick = onTick;
@@ -25,13 +26,15 @@ class GameTimer {
   }
 
   start() {
-    if (this.isRunning) {
-      this.stop(); // Stop existing timer first
+    if (this.isDestroyed || this.isRunning) {
+      if (this.isRunning) this.stop();
     }
+    
+    if (this.isDestroyed) return;
     
     this.isRunning = true;
     this.intervalId = setInterval(() => {
-      if (this.isRunning) {
+      if (this.isRunning && !this.isDestroyed) {
         this.onTick();
       }
     }, 1000);
@@ -47,12 +50,18 @@ class GameTimer {
 
   destroy() {
     this.stop();
+    this.isDestroyed = true;
+    // Clear references to prevent memory leaks
     this.onTick = () => {};
     this.onComplete = () => {};
   }
 
   getIsRunning() {
-    return this.isRunning;
+    return this.isRunning && !this.isDestroyed;
+  }
+
+  getIsDestroyed() {
+    return this.isDestroyed;
   }
 }
 
@@ -81,7 +90,7 @@ export default function GameScreen() {
     isCompleted,
     isDragging,
     isInitialized,
-    cleanupLevel, // New cleanup method
+    cleanupLevel,
     currentLevel: ropeCurrentLevel 
   } = useRopeStore();
 
@@ -91,13 +100,15 @@ export default function GameScreen() {
   const [modalStars, setModalStars] = useState(0);
   const [completionTime, setCompletionTime] = useState(0);
   
-  // Add ref to track if modal has been shown for current level
+  // Enhanced refs for better memory management
   const modalShownForLevel = useRef<number | null>(null);
   const modalClosingRef = useRef(false);
   const gameTimerRef = useRef<GameTimer | null>(null);
   const levelStateRef = useRef(levelState);
   const levelRef = useRef(currentLevel);
   const completionTriggeredRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const appStateRef = useRef(AppState.currentState);
 
   // Update refs when values change
   useEffect(() => {
@@ -108,37 +119,67 @@ export default function GameScreen() {
     levelRef.current = currentLevel;
   }, [currentLevel]);
 
-  // Timer tick handler
+  // App state management to handle backgrounding
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
+        // App has come to the foreground
+        console.log('App resumed, checking timer state');
+        if (levelStateRef.current === 'playing' && gameTimerRef.current && !gameTimerRef.current.getIsRunning()) {
+          gameTimerRef.current.start();
+        }
+      } else if (nextAppState.match(/inactive|background/)) {
+        // App is going to background
+        console.log('App backgrounded, pausing timer');
+        gameTimerRef.current?.stop();
+      }
+      appStateRef.current = nextAppState;
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, []);
+
+  // Enhanced timer tick handler with memory leak prevention
   const handleTimerTick = useCallback(() => {
-    // Check if level is still playing before decrementing
+    if (!isMountedRef.current) return;
+    
     if (levelStateRef.current === 'playing') {
       decrementTime();
     } else {
-      // Stop timer if level state changed
       gameTimerRef.current?.stop();
     }
   }, [decrementTime]);
 
-  // Timer complete handler (when time reaches 0)
+  // Enhanced timer complete handler
   const handleTimerComplete = useCallback(() => {
+    if (!isMountedRef.current) return;
+    
     if (levelStateRef.current === 'playing') {
       failLevel();
     }
   }, [failLevel]);
 
-  // Initialize timer instance
+  // Enhanced timer initialization with proper cleanup
   useEffect(() => {
-    // Create timer instance
+    // Destroy existing timer first
+    if (gameTimerRef.current) {
+      gameTimerRef.current.destroy();
+    }
+    
+    // Create new timer instance
     gameTimerRef.current = new GameTimer(handleTimerTick, handleTimerComplete);
 
     // Cleanup on unmount
     return () => {
-      gameTimerRef.current?.destroy();
-      gameTimerRef.current = null;
+      if (gameTimerRef.current) {
+        gameTimerRef.current.destroy();
+        gameTimerRef.current = null;
+      }
     };
   }, [handleTimerTick, handleTimerComplete]);
 
-  // Clean up rope data when level changes to prevent memory leaks
+  // Enhanced cleanup when level changes
   useEffect(() => {
     if (ropeCurrentLevel !== currentLevel && ropeCurrentLevel > 0) {
       console.log(`Level changed from ${ropeCurrentLevel} to ${currentLevel}, cleaning up rope data`);
@@ -146,8 +187,10 @@ export default function GameScreen() {
     }
   }, [currentLevel, ropeCurrentLevel, cleanupLevel]);
 
-  // Reset level data and timer when level changes
+  // Enhanced level data management
   useEffect(() => {
+    if (!isMountedRef.current) return;
+    
     const data = getCurrentLevelData();
     setLevelData(data);
     
@@ -163,35 +206,42 @@ export default function GameScreen() {
     setTimeRemaining(levelTime);
   }, [currentLevel, getCurrentLevelData, setTimeRemaining, getLevelTimer]);
 
-  // Start timer when level state becomes 'playing'
+  // Enhanced timer management
   useEffect(() => {
+    if (!isMountedRef.current) return;
+    
     const timer = gameTimerRef.current;
-    if (!timer) return;
+    if (!timer || timer.getIsDestroyed()) return;
 
-    if (levelState === 'playing') {
-      // Start timer when level is playing
+    if (levelState === 'playing' && appStateRef.current === 'active') {
       console.log('Starting timer for level', currentLevel);
       timer.start();
     } else {
-      // Stop timer when level is not playing
       console.log('Stopping timer, level state:', levelState);
       timer.stop();
     }
   }, [levelState, currentLevel]);
 
-  // Auto-start level when it's fresh and game board is ready
+  // Enhanced auto-start with memory leak prevention
   useEffect(() => {
+    if (!isMountedRef.current) return;
+    
     if (levelState === 'fresh' && ropes.length > 0) {
-      // Small delay to ensure everything is initialized
-      setTimeout(() => {
-        console.log('Auto-starting fresh level', currentLevel);
-        startLevel();
+      const timeoutId = setTimeout(() => {
+        if (isMountedRef.current && levelStateRef.current === 'fresh') {
+          console.log('Auto-starting fresh level', currentLevel);
+          startLevel();
+        }
       }, 500);
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [levelState, ropes.length, currentLevel, startLevel]);
 
-  // Handle level completion - check for rope completion and show modal
+  // Enhanced completion handling with memory leak prevention
   useEffect(() => {
+    if (!isMountedRef.current) return;
+    
     if (
       isCompleted && 
       ropes.length > 0 && 
@@ -240,8 +290,10 @@ export default function GameScreen() {
     calculateStarsForTime
   ]);
 
-  // Handle level failure - only show when actually failed and stop timer
+  // Enhanced failure handling
   useEffect(() => {
+    if (!isMountedRef.current) return;
+    
     if (
       levelState === 'failed' && 
       !showFailedModal && 
@@ -256,18 +308,30 @@ export default function GameScreen() {
     }
   }, [levelState, showFailedModal, currentLevel]);
 
-  // Cleanup when leaving the game screen
+  // Enhanced cleanup on unmount
   useEffect(() => {
+    isMountedRef.current = true;
+    
     return () => {
       console.log('Game screen unmounting, cleaning up timer and rope data');
-      gameTimerRef.current?.destroy();
-      cleanupLevel(); // Clean up rope data when leaving game
+      isMountedRef.current = false;
+      
+      if (gameTimerRef.current) {
+        gameTimerRef.current.destroy();
+        gameTimerRef.current = null;
+      }
+      
+      // Clean up rope data when leaving game
+      cleanupLevel();
     };
   }, [cleanupLevel]);
 
   const handleBack = () => {
     // Stop and destroy timer when leaving game
-    gameTimerRef.current?.stop();
+    if (gameTimerRef.current) {
+      gameTimerRef.current.destroy();
+      gameTimerRef.current = null;
+    }
     // Clean up rope data to prevent memory leaks
     cleanupLevel();
     router.back();
@@ -290,15 +354,19 @@ export default function GameScreen() {
     cleanupLevel();
     
     // Reset game state to fresh
-    resetGameLevel(); // This sets levelState to 'fresh'
+    resetGameLevel();
     
     // Small delay to ensure cleanup is complete, then reset ropes
-    setTimeout(() => {
-      console.log('Generating fresh ropes for level', currentLevel);
-      resetRopeLevel(); // This will generate completely new ropes
-      modalClosingRef.current = false;
-      // The level will auto-start due to the useEffect above
+    const timeoutId = setTimeout(() => {
+      if (isMountedRef.current) {
+        console.log('Generating fresh ropes for level', currentLevel);
+        resetRopeLevel();
+        modalClosingRef.current = false;
+      }
     }, 200);
+    
+    // Cleanup timeout if component unmounts
+    return () => clearTimeout(timeoutId);
   };
 
   const handleHint = () => {
@@ -315,7 +383,10 @@ export default function GameScreen() {
 
   const handleHome = () => {
     // Stop and destroy timer when going home
-    gameTimerRef.current?.stop();
+    if (gameTimerRef.current) {
+      gameTimerRef.current.destroy();
+      gameTimerRef.current = null;
+    }
     // Clean up rope data to prevent memory leaks
     cleanupLevel();
     router.push('/');
@@ -330,9 +401,13 @@ export default function GameScreen() {
     // Clean up current level data before moving to next
     cleanupLevel();
     
-    setTimeout(() => {
-      modalClosingRef.current = false;
+    const timeoutId = setTimeout(() => {
+      if (isMountedRef.current) {
+        modalClosingRef.current = false;
+      }
     }, 200);
+    
+    return () => clearTimeout(timeoutId);
   };
 
   const handleCloseModal = () => {
@@ -346,9 +421,13 @@ export default function GameScreen() {
     completionTriggeredRef.current = false;
     
     // Reset the closing flag after a delay
-    setTimeout(() => {
-      modalClosingRef.current = false;
+    const timeoutId = setTimeout(() => {
+      if (isMountedRef.current) {
+        modalClosingRef.current = false;
+      }
     }, 500);
+    
+    return () => clearTimeout(timeoutId);
   };
 
   const formatTime = (seconds: number) => {

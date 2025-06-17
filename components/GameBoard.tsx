@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback, useRef } from 'react';
-import { View, Text, Dimensions, Platform } from 'react-native';
+import { View, Text, Dimensions, Platform, AppState } from 'react-native';
 import { Svg } from 'react-native-svg';
 import { useSharedValue } from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -48,17 +48,19 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     updateRopePosition,
     checkIntersections,
     validatePositions,
-    cleanupLevel, // New cleanup method
+    cleanupLevel,
   } = useRopeStore();
 
-  // Add ref to track if level completion has been triggered
+  // Enhanced refs for better memory management
   const completionTriggeredRef = useRef(false);
   const levelRef = useRef(currentLevel);
   const initializationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const positionUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
+  const appStateRef = useRef(AppState.currentState);
+  const lastUpdateTimeRef = useRef(0);
 
   // Create a fixed number of shared values at the top level
-  // This ensures the number of hook calls remains constant
   const sharedValues = [];
   for (let i = 0; i < MAX_ROPES; i++) {
     sharedValues.push({
@@ -69,26 +71,66 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     });
   }
 
-  // Clean up when level changes
+  // App state management for performance
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      if (nextAppState.match(/inactive|background/)) {
+        // App is going to background - pause updates
+        console.log('GameBoard: App backgrounded, pausing updates');
+        if (positionUpdateTimeoutRef.current) {
+          clearTimeout(positionUpdateTimeoutRef.current);
+          positionUpdateTimeoutRef.current = null;
+        }
+      } else if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
+        // App has come to foreground - resume updates
+        console.log('GameBoard: App resumed, resuming updates');
+        if (isMountedRef.current && isInitialized) {
+          validatePositions();
+        }
+      }
+      appStateRef.current = nextAppState;
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, [isInitialized, validatePositions]);
+
+  // Enhanced cleanup when level changes
   useEffect(() => {
     if (currentLevel !== levelRef.current) {
       console.log(`GameBoard: Level changed from ${levelRef.current} to ${currentLevel}, cleaning up`);
-      cleanupLevel(); // Clean up previous level data
+      
+      // Clear all timeouts
+      if (initializationTimeoutRef.current) {
+        clearTimeout(initializationTimeoutRef.current);
+        initializationTimeoutRef.current = null;
+      }
+      if (positionUpdateTimeoutRef.current) {
+        clearTimeout(positionUpdateTimeoutRef.current);
+        positionUpdateTimeoutRef.current = null;
+      }
+      
+      cleanupLevel();
       completionTriggeredRef.current = false;
       levelRef.current = currentLevel;
     }
   }, [currentLevel, cleanupLevel]);
 
-  // Initialize level when component mounts or level changes
+  // Enhanced level initialization with better memory management
   useEffect(() => {
+    if (!isMountedRef.current) return;
+    
     if (currentLevel !== levelRef.current || !isInitialized) {
       // Clear any existing timeout
       if (initializationTimeoutRef.current) {
         clearTimeout(initializationTimeoutRef.current);
+        initializationTimeoutRef.current = null;
       }
 
       // Add a small delay to ensure proper initialization
       initializationTimeoutRef.current = setTimeout(() => {
+        if (!isMountedRef.current) return;
+        
         try {
           console.log(`GameBoard: Initializing level ${currentLevel}`);
           initializeLevel(currentLevel, GAME_BOUNDS);
@@ -96,66 +138,88 @@ export default function GameBoard({ levelData }: GameBoardProps) {
           levelRef.current = currentLevel;
         } catch (error) {
           console.error('Failed to initialize level:', error);
+          cleanupLevel();
         }
+        
+        initializationTimeoutRef.current = null;
       }, 100);
     }
 
     return () => {
       if (initializationTimeoutRef.current) {
         clearTimeout(initializationTimeoutRef.current);
+        initializationTimeoutRef.current = null;
       }
     };
   }, [currentLevel, initializeLevel, isInitialized]);
 
-  // Performance optimization: Batch position updates and reduce frequency
+  // Enhanced position updates with better performance and memory management
   useEffect(() => {
-    if (isInitialized && ropes.length > 0) {
-      // Clear any pending position update
-      if (positionUpdateTimeoutRef.current) {
-        clearTimeout(positionUpdateTimeoutRef.current);
-      }
+    if (!isMountedRef.current || !isInitialized || ropes.length === 0) return;
+    
+    // Skip updates if app is in background
+    if (appStateRef.current.match(/inactive|background/)) return;
 
-      // Batch position updates with longer delay for better performance
-      positionUpdateTimeoutRef.current = setTimeout(() => {
-        // Validate positions first
-        validatePositions();
-        
-        // Update shared values in batches to reduce render cycles
-        const updates = [];
-        ropes.forEach((rope, index) => {
-          const position = ropePositions[rope.id];
-          const shared = sharedValues[index];
-          if (position && shared && index < MAX_ROPES) {
-            updates.push({ position, shared, index });
-          }
-        });
-        
-        // Apply all updates at once
-        updates.forEach(({ position, shared }) => {
-          // Validate position values before setting - avoid reading during render
-          const startX = isNaN(position.startX) ? GAME_BOUNDS.minX + 50 : position.startX;
-          const startY = isNaN(position.startY) ? GAME_BOUNDS.minY + 50 : position.startY;
-          const endX = isNaN(position.endX) ? GAME_BOUNDS.maxX - 50 : position.endX;
-          const endY = isNaN(position.endY) ? GAME_BOUNDS.maxY - 50 : position.endY;
-          
-          // Set values outside of render cycle
-          shared.startX.value = startX;
-          shared.startY.value = startY;
-          shared.endX.value = endX;
-          shared.endY.value = endY;
-        });
-      }, 32); // ~30fps update rate for better performance
+    // Throttle updates more aggressively for better performance
+    const now = Date.now();
+    if (now - lastUpdateTimeRef.current < 50) { // 20fps max
+      return;
     }
+    lastUpdateTimeRef.current = now;
+
+    // Clear any pending position update
+    if (positionUpdateTimeoutRef.current) {
+      clearTimeout(positionUpdateTimeoutRef.current);
+      positionUpdateTimeoutRef.current = null;
+    }
+
+    // Batch position updates with longer delay for better performance
+    positionUpdateTimeoutRef.current = setTimeout(() => {
+      if (!isMountedRef.current || !isInitialized) return;
+      
+      // Validate positions first
+      validatePositions();
+      
+      // Update shared values in batches to reduce render cycles
+      const updates = [];
+      ropes.forEach((rope, index) => {
+        const position = ropePositions[rope.id];
+        const shared = sharedValues[index];
+        if (position && shared && index < MAX_ROPES) {
+          updates.push({ position, shared, index });
+        }
+      });
+      
+      // Apply all updates at once
+      updates.forEach(({ position, shared }) => {
+        // Validate position values before setting
+        const startX = isNaN(position.startX) ? GAME_BOUNDS.minX + 50 : position.startX;
+        const startY = isNaN(position.startY) ? GAME_BOUNDS.minY + 50 : position.startY;
+        const endX = isNaN(position.endX) ? GAME_BOUNDS.maxX - 50 : position.endX;
+        const endY = isNaN(position.endY) ? GAME_BOUNDS.maxY - 50 : position.endY;
+        
+        // Set values outside of render cycle
+        shared.startX.value = startX;
+        shared.startY.value = startY;
+        shared.endX.value = endX;
+        shared.endY.value = endY;
+      });
+      
+      positionUpdateTimeoutRef.current = null;
+    }, 50); // Increased delay for better performance
 
     return () => {
       if (positionUpdateTimeoutRef.current) {
         clearTimeout(positionUpdateTimeoutRef.current);
+        positionUpdateTimeoutRef.current = null;
       }
     };
   }, [ropePositions, ropes, isInitialized, validatePositions]);
 
-  // Check for level completion with proper debouncing - only when not dragging
+  // Enhanced completion checking with memory leak prevention
   useEffect(() => {
+    if (!isMountedRef.current) return;
+    
     if (
       isCompleted && 
       ropes.length > 0 && 
@@ -166,43 +230,66 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     ) {
       completionTriggeredRef.current = true;
       
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
+        if (!isMountedRef.current) return;
+        
         // Calculate stars based on performance
         const baseStars = 1;
-        const timeBonus = intersectionCount === 0 ? 1 : 0; // Bonus for perfect solution
-        const efficiencyBonus = currentLevel <= 3 ? 1 : currentLevel <= 6 ? 2 : 3; // Progressive bonus
+        const timeBonus = intersectionCount === 0 ? 1 : 0;
+        const efficiencyBonus = currentLevel <= 3 ? 1 : currentLevel <= 6 ? 2 : 3;
         
-        const totalStars = Math.min(baseStars + timeBonus + efficiencyBonus, 4); // Max 4 stars
+        const totalStars = Math.min(baseStars + timeBonus + efficiencyBonus, 4);
         completeLevel(totalStars);
-      }, 300); // Reduced delay for better responsiveness
+      }, 300);
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [isCompleted, ropes.length, currentLevel, completeLevel, intersectionCount, gameState, isDragging, isInitialized]);
 
-  // Reset completion trigger when game state changes back to playing
+  // Reset completion trigger when game state changes
   useEffect(() => {
     if (gameState === 'playing') {
       completionTriggeredRef.current = false;
     }
   }, [gameState]);
 
-  // Cleanup on unmount
+  // Enhanced cleanup on unmount
   useEffect(() => {
+    isMountedRef.current = true;
+    
     return () => {
       console.log('GameBoard: Unmounting, cleaning up data');
-      cleanupLevel();
+      isMountedRef.current = false;
+      
+      // Clear all timeouts
       if (initializationTimeoutRef.current) {
         clearTimeout(initializationTimeoutRef.current);
+        initializationTimeoutRef.current = null;
       }
       if (positionUpdateTimeoutRef.current) {
         clearTimeout(positionUpdateTimeoutRef.current);
+        positionUpdateTimeoutRef.current = null;
       }
+      
+      cleanupLevel();
     };
   }, [cleanupLevel]);
 
-  // Performance optimized position change handler
+  // Enhanced position change handler with throttling
   const handlePositionChange = useCallback((ropeId: string, endpoint: 'start' | 'end', sharedX: any, sharedY: any) => {
+    if (!isMountedRef.current) return;
+    
+    // Throttle position updates for better performance
+    const now = Date.now();
+    if (now - lastUpdateTimeRef.current < 16) { // 60fps max
+      return;
+    }
+    lastUpdateTimeRef.current = now;
+    
     // Use a callback to avoid reading shared values during render
     const updatePosition = () => {
+      if (!isMountedRef.current) return;
+      
       // Validate shared values before using them
       const x = isNaN(sharedX.value) ? GAME_BOUNDS.minX + 50 : sharedX.value;
       const y = isNaN(sharedY.value) ? GAME_BOUNDS.minY + 50 : sharedY.value;
@@ -214,8 +301,13 @@ export default function GameBoard({ levelData }: GameBoardProps) {
       updateRopePosition(ropeId, positionUpdate);
     };
     
-    // Defer the update to avoid reading during render and batch updates
-    requestAnimationFrame(updatePosition);
+    // Use requestAnimationFrame for better performance
+    if (typeof requestAnimationFrame !== 'undefined') {
+      requestAnimationFrame(updatePosition);
+    } else {
+      // Fallback for environments without requestAnimationFrame
+      setTimeout(updatePosition, 0);
+    }
   }, [updateRopePosition]);
 
   // Show loading state while initializing

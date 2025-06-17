@@ -17,7 +17,7 @@ export interface RopeState {
   isDragging: boolean;
   isInitialized: boolean;
   dragCount: number;
-  currentLevel: number; // Track current level to detect changes
+  currentLevel: number;
 }
 
 interface RopeStore extends RopeState {
@@ -29,7 +29,7 @@ interface RopeStore extends RopeState {
   setDragging: (dragging: boolean) => void;
   clearAll: () => void;
   validatePositions: () => void;
-  cleanupLevel: () => void; // New method for thorough cleanup
+  cleanupLevel: () => void;
 }
 
 const initialState: RopeState = {
@@ -44,11 +44,24 @@ const initialState: RopeState = {
   currentLevel: 0,
 };
 
-// Performance optimization: Debounce intersection checks
+// Global timeout management to prevent memory leaks
 let intersectionCheckTimeout: NodeJS.Timeout | null = null;
+let positionUpdateTimeout: NodeJS.Timeout | null = null;
 let lastIntersectionCheck = 0;
-const INTERSECTION_CHECK_DEBOUNCE = 100; // ms
-const MIN_CHECK_INTERVAL = 50; // ms
+const INTERSECTION_CHECK_DEBOUNCE = 150; // Increased debounce for better performance
+const MIN_CHECK_INTERVAL = 100; // Increased minimum interval
+
+// Cleanup function to clear all timeouts
+const clearAllTimeouts = () => {
+  if (intersectionCheckTimeout) {
+    clearTimeout(intersectionCheckTimeout);
+    intersectionCheckTimeout = null;
+  }
+  if (positionUpdateTimeout) {
+    clearTimeout(positionUpdateTimeout);
+    positionUpdateTimeout = null;
+  }
+};
 
 export const useRopeStore = create<RopeStore>((set, get) => ({
   ...initialState,
@@ -57,22 +70,24 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
     try {
       console.log('Initializing rope level', level);
       
-      // Clean up previous level data first
+      // Clear all timeouts first to prevent memory leaks
+      clearAllTimeouts();
+      
+      // Clean up previous level data
       const currentState = get();
-      if (currentState.currentLevel !== level) {
+      if (currentState.currentLevel !== level && currentState.currentLevel > 0) {
         console.log('Level changed, cleaning up previous level data');
         get().cleanupLevel();
       }
       
       const ropeCount = Math.min(level + 1, 10);
       
-      // Generate fresh ropes for this level - no memory of previous states
+      // Generate fresh ropes
       const generatedRopes = generateCrossedRopes(ropeCount, bounds);
       
-      // Create fresh positions - completely new data
+      // Create fresh positions with validation
       const positions: { [ropeId: string]: RopePosition } = {};
       generatedRopes.forEach(rope => {
-        // Validate and clamp positions within bounds
         const startX = Math.max(bounds.minX, Math.min(bounds.maxX, 
           isNaN(rope.start.x) ? bounds.minX + 50 : rope.start.x));
         const startY = Math.max(bounds.minY, Math.min(bounds.maxY, 
@@ -87,7 +102,7 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
 
       const initialIntersections = countIntersections(generatedRopes);
 
-      // Set completely fresh state
+      // Set fresh state
       set({
         ropes: generatedRopes,
         ropePositions: positions,
@@ -103,7 +118,6 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
       console.log(`Level ${level} initialized with ${generatedRopes.length} ropes and ${initialIntersections} intersections`);
     } catch (error) {
       console.error('Failed to initialize level:', error);
-      // Fallback to clean state
       get().cleanupLevel();
       set({
         ...initialState,
@@ -150,16 +164,20 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
 
     set({ ropePositions: newPositions });
     
-    // Performance optimization: Debounced intersection checking
+    // Debounced intersection checking with proper cleanup
     const now = Date.now();
-    if (state.dragCount === 0 && now - lastIntersectionCheck > MIN_CHECK_INTERVAL) {
+    if (!state.isDragging && now - lastIntersectionCheck > MIN_CHECK_INTERVAL) {
       if (intersectionCheckTimeout) {
         clearTimeout(intersectionCheckTimeout);
       }
       
       intersectionCheckTimeout = setTimeout(() => {
         lastIntersectionCheck = Date.now();
-        get().checkIntersections();
+        const currentState = get();
+        if (currentState.isInitialized && !currentState.isDragging) {
+          get().checkIntersections();
+        }
+        intersectionCheckTimeout = null; // Clear reference
       }, INTERSECTION_CHECK_DEBOUNCE);
     }
   },
@@ -167,30 +185,33 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
   checkIntersections: () => {
     const state = get();
     
-    // Performance optimization: Skip if dragging or not initialized
     if (state.isDragging || !state.isInitialized || state.ropes.length === 0) {
       return state.intersectionCount;
     }
     
-    const currentRopes = get().getCurrentRopes();
-    const newIntersectionCount = countIntersections(currentRopes);
-    const isCompleted = newIntersectionCount === 0 && currentRopes.length > 0 && state.dragCount === 0;
+    try {
+      const currentRopes = get().getCurrentRopes();
+      const newIntersectionCount = countIntersections(currentRopes);
+      const isCompleted = newIntersectionCount === 0 && currentRopes.length > 0 && state.dragCount === 0;
 
-    // Only update state if values actually changed
-    if (newIntersectionCount !== state.intersectionCount || isCompleted !== state.isCompleted) {
-      set({
-        intersectionCount: newIntersectionCount,
-        isCompleted,
-      });
+      // Only update state if values changed
+      if (newIntersectionCount !== state.intersectionCount || isCompleted !== state.isCompleted) {
+        set({
+          intersectionCount: newIntersectionCount,
+          isCompleted,
+        });
+      }
+
+      return newIntersectionCount;
+    } catch (error) {
+      console.error('Error checking intersections:', error);
+      return state.intersectionCount;
     }
-
-    return newIntersectionCount;
   },
 
   getCurrentRopes: () => {
     const { ropes, ropePositions } = get();
     
-    // Performance optimization: Use cached result if positions haven't changed
     return ropes.map(rope => {
       const position = ropePositions[rope.id];
       if (!position) return rope;
@@ -219,17 +240,19 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
       dragCount: newDragCount,
     });
     
-    // Performance optimization: Only check intersections when all dragging ends
+    // Check intersections when dragging stops with proper cleanup
     if (newDragCount === 0) {
-      // Clear any pending intersection checks
       if (intersectionCheckTimeout) {
         clearTimeout(intersectionCheckTimeout);
       }
       
-      // Immediate check when dragging stops
-      setTimeout(() => {
-        get().checkIntersections();
-      }, 50);
+      intersectionCheckTimeout = setTimeout(() => {
+        const currentState = get();
+        if (currentState.isInitialized && !currentState.isDragging) {
+          get().checkIntersections();
+        }
+        intersectionCheckTimeout = null;
+      }, 100);
     }
   },
 
@@ -258,18 +281,14 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
   resetLevel: () => {
     console.log('Resetting rope level');
     
-    // Clear any pending intersection checks
-    if (intersectionCheckTimeout) {
-      clearTimeout(intersectionCheckTimeout);
-    }
+    // Clear all timeouts
+    clearAllTimeouts();
     
     const { bounds, currentLevel } = get();
     if (bounds && currentLevel > 0) {
-      // Clean up current data and re-initialize fresh
       get().cleanupLevel();
       get().initializeLevel(currentLevel, bounds);
     } else {
-      // Reset to initial state if no bounds
       set(initialState);
     }
   },
@@ -277,11 +296,8 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
   cleanupLevel: () => {
     console.log('Cleaning up level data to prevent memory leaks');
     
-    // Clear any pending intersection checks
-    if (intersectionCheckTimeout) {
-      clearTimeout(intersectionCheckTimeout);
-      intersectionCheckTimeout = null;
-    }
+    // Clear all timeouts
+    clearAllTimeouts();
     
     // Reset timing variables
     lastIntersectionCheck = 0;
@@ -297,7 +313,7 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
       dragCount: 0,
     });
     
-    // Force garbage collection hint (if available)
+    // Force garbage collection if available
     if (typeof global !== 'undefined' && global.gc) {
       global.gc();
     }
@@ -306,11 +322,8 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
   clearAll: () => {
     console.log('Clearing all rope data');
     
-    // Clear any pending intersection checks
-    if (intersectionCheckTimeout) {
-      clearTimeout(intersectionCheckTimeout);
-      intersectionCheckTimeout = null;
-    }
+    // Clear all timeouts
+    clearAllTimeouts();
     
     lastIntersectionCheck = 0;
     get().cleanupLevel();

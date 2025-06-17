@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { Platform, View, PanResponder } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { Platform, View, PanResponder, AppState } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   withSpring,
@@ -44,11 +44,13 @@ export default function DraggableDot({
   
   const { setDragging } = useRopeStore();
   
-  // Store the starting position when gesture begins
+  // Enhanced state management with memory leak prevention
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
   const isDragging = useSharedValue(false);
   const isPressed = useSharedValue(false);
+  const isMountedRef = useRef(true);
+  const appStateRef = useRef(AppState.currentState);
   
   // Track the last valid position to prevent jumping
   const lastValidX = useSharedValue(position.x.value);
@@ -56,9 +58,12 @@ export default function DraggableDot({
   
   // Performance optimization: Throttle position change callbacks
   const lastCallbackTime = useRef(0);
-  const CALLBACK_THROTTLE = 16; // ~60fps
+  const CALLBACK_THROTTLE = 32; // ~30fps for better performance
   
+  // Enhanced throttled callback with memory leak prevention
   const throttledPositionChange = () => {
+    if (!isMountedRef.current) return;
+    
     const now = Date.now();
     if (now - lastCallbackTime.current > CALLBACK_THROTTLE) {
       lastCallbackTime.current = now;
@@ -67,13 +72,46 @@ export default function DraggableDot({
       }
     }
   };
+
+  // App state management for performance
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      if (nextAppState.match(/inactive|background/)) {
+        // App is going to background - stop any ongoing gestures
+        if (isDragging.value) {
+          isDragging.value = false;
+          isPressed.value = false;
+          setDragging(false);
+        }
+      }
+      appStateRef.current = nextAppState;
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, []);
+
+  // Component lifecycle management
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    return () => {
+      isMountedRef.current = false;
+      // Clean up any ongoing gestures
+      if (isDragging.value) {
+        setDragging(false);
+      }
+    };
+  }, []);
   
-  // Web-specific pan responder
+  // Enhanced web-specific pan responder with memory leak prevention
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponder: () => isMountedRef.current && appStateRef.current === 'active',
+      onMoveShouldSetPanResponderCapture: () => isMountedRef.current && appStateRef.current === 'active',
       onPanResponderGrant: (evt) => {
+        if (!isMountedRef.current) return;
+        
         startX.value = position.x.value;
         startY.value = position.y.value;
         lastValidX.value = position.x.value;
@@ -83,6 +121,8 @@ export default function DraggableDot({
         setDragging(true);
       },
       onPanResponderMove: (evt, gestureState) => {
+        if (!isMountedRef.current || appStateRef.current !== 'active') return;
+        
         const newX = clamp(
           startX.value + gestureState.dx,
           bounds.minX,
@@ -103,6 +143,8 @@ export default function DraggableDot({
         throttledPositionChange();
       },
       onPanResponderRelease: () => {
+        if (!isMountedRef.current) return;
+        
         isDragging.value = false;
         isPressed.value = false;
         
@@ -131,6 +173,8 @@ export default function DraggableDot({
         }
       },
       onPanResponderTerminate: () => {
+        if (!isMountedRef.current) return;
+        
         // Handle gesture termination - restore to last valid position
         isDragging.value = false;
         isPressed.value = false;
@@ -155,10 +199,12 @@ export default function DraggableDot({
     })
   ).current;
 
-  // Enhanced native gesture handler with better iOS support and performance optimization
+  // Enhanced native gesture handler with better performance and memory management
   const panGesture = Gesture.Pan()
     .onBegin(() => {
       'worklet';
+      if (!isMountedRef.current) return;
+      
       startX.value = position.x.value;
       startY.value = position.y.value;
       lastValidX.value = position.x.value;
@@ -169,6 +215,8 @@ export default function DraggableDot({
     })
     .onUpdate((event) => {
       'worklet';
+      if (!isMountedRef.current) return;
+      
       // Calculate new position based on translation
       const newX = clamp(
         startX.value + event.translationX,
@@ -194,6 +242,8 @@ export default function DraggableDot({
     })
     .onEnd(() => {
       'worklet';
+      if (!isMountedRef.current) return;
+      
       isDragging.value = false;
       isPressed.value = false;
       
@@ -233,18 +283,19 @@ export default function DraggableDot({
     .onFinalize(() => {
       'worklet';
       // Fallback to ensure state is properly reset
-      if (isDragging.value) {
+      if (isDragging.value && isMountedRef.current) {
         isDragging.value = false;
         isPressed.value = false;
         runOnJS(setDragging)(false);
       }
     })
-    .minDistance(0) // Allow immediate response to touch
-    .shouldCancelWhenOutside(false) // Don't cancel when dragging outside
-    .activateAfterLongPress(0) // Immediate activation
-    .maxPointers(1) // Only allow single touch
-    .runOnJS(false); // Run on UI thread for better performance
+    .minDistance(0)
+    .shouldCancelWhenOutside(false)
+    .activateAfterLongPress(0)
+    .maxPointers(1)
+    .runOnJS(false);
 
+  // Enhanced animated style with better performance
   const animatedStyle = useAnimatedStyle(() => {
     'worklet';
     // Enhanced visual feedback with better scaling and positioning
@@ -258,22 +309,22 @@ export default function DraggableDot({
       { duration: 100 }
     );
     
-    // Ensure valid position values - use worklet-safe access
+    // Ensure valid position values
     const x = isNaN(position.x.value) ? lastValidX.value : position.x.value;
     const y = isNaN(position.y.value) ? lastValidY.value : position.y.value;
     
     return {
       transform: [
-        { translateX: x - 25 }, // Adjusted for dot size
+        { translateX: x - 25 },
         { translateY: y - 25 },
         { scale },
       ],
       opacity,
-      zIndex: isDragging.value ? 1000 : 10, // Bring to front when dragging
+      zIndex: isDragging.value ? 1000 : 10,
     };
   });
 
-  // Web implementation with PanResponder
+  // Web implementation with enhanced PanResponder
   if (Platform.OS === 'web') {
     return (
       <Animated.View 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { X, RotateCcw, Home, Lightbulb } from 'lucide-react-native';
+import { X, RotateCcw, Chrome as Home, Lightbulb } from 'lucide-react-native';
 
 interface FailureModalProps {
   visible: boolean;

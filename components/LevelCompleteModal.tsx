@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Star, ArrowRight, Home, RotateCcw } from 'lucide-react-native';
+import { Star, ArrowRight, Chrome as Home, RotateCcw } from 'lucide-react-native';
 
 interface LevelCompleteModalProps {
   visible: boolean;

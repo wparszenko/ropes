@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, Dimensions, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, RotateCcw, Lightbulb, Home } from 'lucide-react-native';
+import { ArrowLeft, RotateCcw, Lightbulb, Chrome as Home } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useGameStore } from '@/store/gameStore';
 import GameBoard from '@/components/GameBoard';

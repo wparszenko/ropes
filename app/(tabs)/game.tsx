@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, RotateCcw, Lightbulb, Chrome as Home } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useGameStore } from '@/store/gameStore';
+import { useRopeStore } from '@/store/ropeStore';
 import GameBoard from '@/components/GameBoard';
 import LevelCompleteModal from '@/components/LevelCompleteModal';
 
@@ -13,14 +14,15 @@ export default function GameScreen() {
   const {
     currentLevel,
     gameState,
-    resetLevel,
+    resetLevel: resetGameLevel,
     getCurrentLevelData,
   } = useGameStore();
+
+  const { resetLevel: resetRopeLevel, ropes, intersectionCount } = useRopeStore();
 
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [levelData, setLevelData] = useState(null);
   const [gameTime, setGameTime] = useState(0);
-  const [moves, setMoves] = useState(0);
 
   useEffect(() => {
     const data = getCurrentLevelData();
@@ -48,16 +50,16 @@ export default function GameScreen() {
   };
 
   const handleReset = () => {
-    resetLevel();
+    resetGameLevel();
+    resetRopeLevel();
     setGameTime(0);
-    setMoves(0);
   };
 
   const handleHint = () => {
-    const ropeCount = Math.min(currentLevel + 1, 10);
+    const ropeCount = ropes.length;
     Alert.alert(
       'How to Play',
-      `Drag the colored dots to move the rope endpoints. Your goal is to untangle all ${ropeCount} ropes so that none of them cross each other. When all ropes are untangled, you win!\n\nTip: Try to identify which ropes are crossing and move their endpoints to separate them.`,
+      `Drag the colored dots to move the rope endpoints. Your goal is to untangle all ${ropeCount} ropes so that none of them cross each other. When all ropes are untangled, you win!\n\nTip: Try to identify which ropes are crossing and move their endpoints to separate them.\n\nCurrent intersections: ${intersectionCount}`,
       [{ text: 'Got it!' }]
     );
   };
@@ -68,7 +70,6 @@ export default function GameScreen() {
 
   const handleNextLevel = () => {
     setShowCompleteModal(false);
-    // Move to next level
     router.push('/levels');
   };
 
@@ -90,7 +91,7 @@ export default function GameScreen() {
     );
   }
 
-  const ropeCount = Math.min(currentLevel + 1, 10);
+  const ropeCount = ropes.length || Math.min(currentLevel + 1, 10);
 
   return (
     <View style={styles.container}>
@@ -124,12 +125,11 @@ export default function GameScreen() {
             <Text style={styles.statValue}>{ropeCount}</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Difficulty</Text>
+            <Text style={styles.statLabel}>Crossings</Text>
             <Text style={[styles.statValue, { 
-              color: levelData.difficulty === 'easy' ? '#18FF92' : 
-                     levelData.difficulty === 'medium' ? '#FFE347' : '#FF5050' 
+              color: intersectionCount === 0 ? '#18FF92' : '#FF5050'
             }]}>
-              {levelData.difficulty.toUpperCase()}
+              {intersectionCount}
             </Text>
           </View>
         </View>

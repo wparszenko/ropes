@@ -1,12 +1,13 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { View, StyleSheet, Dimensions, Platform, Text } from 'react-native';
 import { Svg } from 'react-native-svg';
 import { useSharedValue } from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import DraggableDot from '@/components/DraggableDot';
 import RopePath from '@/components/RopePath';
-import { generateCrossedRopes, areRopesUntangled, countIntersections, type Rope, type GameBounds } from '@/utils/ropeGenerator';
+import { type GameBounds } from '@/utils/ropeGenerator';
 import { useGameStore } from '@/store/gameStore';
+import { useRopeStore } from '@/store/ropeStore';
 
 const { width, height } = Dimensions.get('window');
 
@@ -33,61 +34,62 @@ interface GameBoardProps {
 
 export default function GameBoard({ levelData }: GameBoardProps) {
   const { currentLevel, completeLevel } = useGameStore();
-  const [ropes, setRopes] = useState<Rope[]>([]);
-  const [ropePositions, setRopePositions] = useState<{ [key: string]: any }>({});
-  const [intersectionCount, setIntersectionCount] = useState(0);
+  const { 
+    ropes, 
+    ropePositions, 
+    intersectionCount, 
+    isCompleted,
+    initializeLevel,
+    updateRopePosition,
+    checkIntersections 
+  } = useRopeStore();
 
-  // Generate ropes for the current level
+  // Initialize level when component mounts or level changes
   useEffect(() => {
-    const ropeCount = Math.min(currentLevel + 1, 10); // Start with 2 ropes, max 10
-    const generatedRopes = generateCrossedRopes(ropeCount, GAME_BOUNDS);
-    setRopes(generatedRopes);
-    
-    // Initialize shared values for each rope
-    const positions: { [key: string]: any } = {};
-    generatedRopes.forEach(rope => {
-      positions[rope.id] = {
-        startX: useSharedValue(rope.start.x),
-        startY: useSharedValue(rope.start.y),
-        endX: useSharedValue(rope.end.x),
-        endY: useSharedValue(rope.end.y),
-      };
-    });
-    setRopePositions(positions);
-    
-    // Count initial intersections
-    setIntersectionCount(countIntersections(generatedRopes));
-  }, [currentLevel]);
+    initializeLevel(currentLevel, GAME_BOUNDS);
+  }, [currentLevel, initializeLevel]);
 
-  // Check for intersections after any rope movement
-  const checkIntersections = useCallback(() => {
-    if (ropes.length === 0 || Object.keys(ropePositions).length === 0) return;
-
-    // Create current rope state from shared values
-    const currentRopes: Rope[] = ropes.map(rope => ({
-      ...rope,
-      start: {
-        x: ropePositions[rope.id]?.startX?.value || rope.start.x,
-        y: ropePositions[rope.id]?.startY?.value || rope.start.y,
-      },
-      end: {
-        x: ropePositions[rope.id]?.endX?.value || rope.end.x,
-        y: ropePositions[rope.id]?.endY?.value || rope.end.y,
-      },
-    }));
-
-    const newIntersectionCount = countIntersections(currentRopes);
-    setIntersectionCount(newIntersectionCount);
-
-    // Check if puzzle is solved
-    if (newIntersectionCount === 0 && ropes.length > 0) {
-      // Small delay to let the animation finish
+  // Check for level completion
+  useEffect(() => {
+    if (isCompleted && ropes.length > 0) {
       setTimeout(() => {
         const stars = currentLevel <= 3 ? 3 : currentLevel <= 6 ? 2 : 1;
         completeLevel(stars);
       }, 500);
     }
-  }, [ropes, ropePositions, currentLevel, completeLevel]);
+  }, [isCompleted, ropes.length, currentLevel, completeLevel]);
+
+  // Create shared values for each rope endpoint
+  const createSharedValues = useCallback((ropeId: string) => {
+    const position = ropePositions[ropeId];
+    if (!position) return null;
+
+    return {
+      startX: useSharedValue(position.startX),
+      startY: useSharedValue(position.startY),
+      endX: useSharedValue(position.endX),
+      endY: useSharedValue(position.endY),
+    };
+  }, [ropePositions]);
+
+  // Handle rope position updates
+  const handlePositionChange = useCallback((ropeId: string, endpoint: 'start' | 'end', x: number, y: number) => {
+    const positionUpdate = endpoint === 'start' 
+      ? { startX: x, startY: y }
+      : { endX: x, endY: y };
+    
+    updateRopePosition(ropeId, positionUpdate);
+  }, [updateRopePosition]);
+
+  if (ropes.length === 0) {
+    return (
+      <View style={[styles.container, { height: BOARD_HEIGHT }]}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading Level {currentLevel}...</Text>
+        </View>
+      </View>
+    );
+  }
 
   const containerContent = (
     <View style={[styles.container, { height: BOARD_HEIGHT }]}>
@@ -95,14 +97,17 @@ export default function GameBoard({ levelData }: GameBoardProps) {
       <View style={styles.svgContainer}>
         <Svg width={BOARD_WIDTH} height={BOARD_HEIGHT} style={styles.svg}>
           {ropes.map(rope => {
-            const positions = ropePositions[rope.id];
-            if (!positions) return null;
+            const position = ropePositions[rope.id];
+            if (!position) return null;
+            
+            const sharedValues = createSharedValues(rope.id);
+            if (!sharedValues) return null;
             
             return (
               <RopePath
                 key={rope.id}
-                startPoint={{ x: positions.startX, y: positions.startY }}
-                endPoint={{ x: positions.endX, y: positions.endY }}
+                startPoint={{ x: sharedValues.startX, y: sharedValues.startY }}
+                endPoint={{ x: sharedValues.endX, y: sharedValues.endY }}
                 color={rope.color}
               />
             );
@@ -113,22 +118,39 @@ export default function GameBoard({ levelData }: GameBoardProps) {
       {/* Dots Layer - Above SVG */}
       <View style={styles.dotsContainer}>
         {ropes.map(rope => {
-          const positions = ropePositions[rope.id];
-          if (!positions) return null;
+          const position = ropePositions[rope.id];
+          if (!position) return null;
+
+          const sharedValues = createSharedValues(rope.id);
+          if (!sharedValues) return null;
 
           return (
             <React.Fragment key={rope.id}>
               <DraggableDot 
-                position={{ x: positions.startX, y: positions.startY }}
+                position={{ x: sharedValues.startX, y: sharedValues.startY }}
                 color={rope.color}
                 bounds={GAME_BOUNDS}
-                onPositionChange={checkIntersections}
+                onPositionChange={() => {
+                  handlePositionChange(
+                    rope.id, 
+                    'start', 
+                    sharedValues.startX.value, 
+                    sharedValues.startY.value
+                  );
+                }}
               />
               <DraggableDot 
-                position={{ x: positions.endX, y: positions.endY }}
+                position={{ x: sharedValues.endX, y: sharedValues.endY }}
                 color={rope.color}
                 bounds={GAME_BOUNDS}
-                onPositionChange={checkIntersections}
+                onPositionChange={() => {
+                  handlePositionChange(
+                    rope.id, 
+                    'end', 
+                    sharedValues.endX.value, 
+                    sharedValues.endY.value
+                  );
+                }}
               />
             </React.Fragment>
           );
@@ -144,6 +166,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
           <View style={styles.debugText}>
             <Text style={styles.debugLabel}>Intersections: {intersectionCount}</Text>
             <Text style={styles.debugLabel}>Ropes: {ropes.length}</Text>
+            <Text style={styles.debugLabel}>Completed: {isCompleted ? 'Yes' : 'No'}</Text>
           </View>
         </View>
       )}
@@ -186,6 +209,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 18,
+    color: '#FFFFFF',
+    marginTop: 16,
+    fontWeight: '600',
   },
   svgContainer: {
     position: 'absolute',

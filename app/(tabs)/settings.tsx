@@ -18,7 +18,7 @@ export default function SettingsScreen() {
   const handleResetProgress = () => {
     Alert.alert(
       'Reset Progress',
-      'Are you sure you want to reset all your progress? This action cannot be undone.',
+      'Are you sure you want to reset all your progress? This action cannot be undone and will clear all levels, stars, and achievements.',
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -26,16 +26,34 @@ export default function SettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Clear rope store data
+              console.log('User confirmed reset, starting process...');
+              
+              // Clear rope store data first
               clearAll();
+              console.log('Rope store cleared');
               
               // Reset game progress
               await resetProgress();
+              console.log('Game progress reset completed');
               
-              Alert.alert('Success', 'Your progress has been reset.');
+              Alert.alert(
+                'Success', 
+                'Your progress has been completely reset. All levels, stars, and achievements have been cleared.',
+                [{ 
+                  text: 'OK', 
+                  onPress: () => {
+                    // Navigate back to home to show the reset state
+                    router.push('/');
+                  }
+                }]
+              );
             } catch (error) {
               console.error('Failed to reset progress:', error);
-              Alert.alert('Error', 'Failed to reset progress. Please try again.');
+              Alert.alert(
+                'Error', 
+                'Failed to completely reset progress. Some data may still remain. Please restart the app and try again.',
+                [{ text: 'OK' }]
+              );
             }
           }
         },

@@ -33,7 +33,7 @@ interface GameStore extends GameState {
   completeLevel: (stars: number) => void;
   failLevel: () => void;
   updateSettings: (newSettings: Partial<GameSettings>) => void;
-  resetProgress: () => void;
+  resetProgress: () => Promise<void>;
   updateWireConnection: (wireId: string, connected: boolean) => void;
   updateRobotPosition: (position: { x: number; y: number }) => void;
   activatePortal: () => void;
@@ -123,25 +123,69 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   resetProgress: async () => {
     try {
-      // Clear AsyncStorage
+      console.log('Starting progress reset...');
+      
+      // Clear ALL AsyncStorage keys related to the game
+      const keys = await AsyncStorage.getAllKeys();
+      const gameKeys = keys.filter(key => 
+        key.includes('tangleEscape') || 
+        key.includes('gameState') || 
+        key.includes('rope') ||
+        key.includes('level')
+      );
+      
+      if (gameKeys.length > 0) {
+        await AsyncStorage.multiRemove(gameKeys);
+        console.log('Cleared AsyncStorage keys:', gameKeys);
+      }
+      
+      // Also try to remove the specific key we use
       await AsyncStorage.removeItem('tangleEscapeGameState');
       
-      // Reset to initial state but keep settings
+      // Reset to complete initial state but preserve settings
       const currentSettings = get().settings;
+      
+      // Force a complete reset
       set({
-        ...initialState,
+        currentLevel: 1,
+        gameState: 'playing',
+        playerStats: {
+          completedLevels: 0,
+          totalStars: 0,
+          levelStars: {},
+          totalPlayTime: 0,
+          highestUnlockedLevel: 1,
+        },
         settings: currentSettings, // Preserve user settings
+        wireConnections: {},
+        robotPosition: { x: 100, y: 100 },
+        portalActive: false,
       });
       
-      console.log('Progress reset successfully');
+      console.log('Progress reset completed successfully');
+      
     } catch (error) {
       console.error('Failed to reset progress:', error);
-      // Fallback: reset state without AsyncStorage
+      
+      // Fallback: force reset state even if AsyncStorage fails
       const currentSettings = get().settings;
       set({
-        ...initialState,
+        currentLevel: 1,
+        gameState: 'playing',
+        playerStats: {
+          completedLevels: 0,
+          totalStars: 0,
+          levelStars: {},
+          totalPlayTime: 0,
+          highestUnlockedLevel: 1,
+        },
         settings: currentSettings,
+        wireConnections: {},
+        robotPosition: { x: 100, y: 100 },
+        portalActive: false,
       });
+      
+      throw error; // Re-throw to let the UI handle the error
     }
   },
 

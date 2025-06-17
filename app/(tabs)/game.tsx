@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, Dimensions, Alert, StyleSheet, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, RotateCcw, Lightbulb, Home, Play, Pause, Zap } from 'lucide-react-native';
+import { ArrowLeft, RotateCcw, Lightbulb, Chrome as Home, Play, Pause, Zap } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useGameStore } from '@/store/gameStore';
 

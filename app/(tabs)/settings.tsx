@@ -1,20 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Switch, ScrollView, StyleSheet, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { 
-  ArrowLeft, 
-  Volume2, 
-  VolumeX, 
-  Vibrate, 
-  Trash2, 
-  Info, 
-  User, 
-  Shield, 
-  HelpCircle,
-  Star,
-  Trophy,
-  Settings as SettingsIcon
-} from 'lucide-react-native';
+import { ArrowLeft, Volume2, VolumeX, Vibrate, Trash2, Info, User, Shield, CircleHelp as HelpCircle, Star, Trophy, Settings as SettingsIcon } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useGameStore } from '@/store/gameStore';
 

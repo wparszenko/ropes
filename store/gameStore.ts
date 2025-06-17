@@ -121,12 +121,28 @@ export const useGameStore = create<GameStore>((set, get) => ({
     get().saveGameState();
   },
 
-  resetProgress: () => {
-    set({
-      ...initialState,
-      settings: get().settings, // Keep settings
-    });
-    get().saveGameState();
+  resetProgress: async () => {
+    try {
+      // Clear AsyncStorage
+      await AsyncStorage.removeItem('tangleEscapeGameState');
+      
+      // Reset to initial state but keep settings
+      const currentSettings = get().settings;
+      set({
+        ...initialState,
+        settings: currentSettings, // Preserve user settings
+      });
+      
+      console.log('Progress reset successfully');
+    } catch (error) {
+      console.error('Failed to reset progress:', error);
+      // Fallback: reset state without AsyncStorage
+      const currentSettings = get().settings;
+      set({
+        ...initialState,
+        settings: currentSettings,
+      });
+    }
   },
 
   updateWireConnection: (wireId: string, connected: boolean) => {

@@ -4,10 +4,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Volume2, VolumeX, Vibrate, Trash2, Info, User, Shield, CircleHelp as HelpCircle, Star, Trophy, Settings as SettingsIcon } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useGameStore } from '@/store/gameStore';
+import { useRopeStore } from '@/store/ropeStore';
 import { settingsScreenStyles } from '@/styles/settingsScreenStyles';
 
 export default function SettingsScreen() {
   const { settings, updateSettings, resetProgress, playerStats } = useGameStore();
+  const { clearAll } = useRopeStore();
 
   const handleBack = () => {
     router.back();
@@ -22,9 +24,19 @@ export default function SettingsScreen() {
         { 
           text: 'Reset', 
           style: 'destructive',
-          onPress: () => {
-            resetProgress();
-            Alert.alert('Success', 'Your progress has been reset.');
+          onPress: async () => {
+            try {
+              // Clear rope store data
+              clearAll();
+              
+              // Reset game progress
+              await resetProgress();
+              
+              Alert.alert('Success', 'Your progress has been reset.');
+            } catch (error) {
+              console.error('Failed to reset progress:', error);
+              Alert.alert('Error', 'Failed to reset progress. Please try again.');
+            }
           }
         },
       ]

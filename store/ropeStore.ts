@@ -14,7 +14,8 @@ export interface RopeState {
   intersectionCount: number;
   isCompleted: boolean;
   bounds: GameBounds | null;
-  isDragging: boolean; // Add dragging state
+  isDragging: boolean;
+  isInitialized: boolean; // Add initialization tracking
 }
 
 interface RopeStore extends RopeState {
@@ -23,7 +24,8 @@ interface RopeStore extends RopeState {
   checkIntersections: () => number;
   resetLevel: () => void;
   getCurrentRopes: () => Rope[];
-  setDragging: (dragging: boolean) => void; // Add dragging control
+  setDragging: (dragging: boolean) => void;
+  clearAll: () => void; // Add method to clear all data
 }
 
 const initialState: RopeState = {
@@ -33,36 +35,52 @@ const initialState: RopeState = {
   isCompleted: false,
   bounds: null,
   isDragging: false,
+  isInitialized: false,
 };
 
 export const useRopeStore = create<RopeStore>((set, get) => ({
   ...initialState,
 
   initializeLevel: (level: number, bounds: GameBounds) => {
-    const ropeCount = Math.min(level + 1, 10);
-    const generatedRopes = generateCrossedRopes(ropeCount, bounds);
-    
-    // Initialize positions from generated ropes
-    const positions: { [ropeId: string]: RopePosition } = {};
-    generatedRopes.forEach(rope => {
-      positions[rope.id] = {
-        startX: rope.start.x,
-        startY: rope.start.y,
-        endX: rope.end.x,
-        endY: rope.end.y,
-      };
-    });
+    try {
+      const ropeCount = Math.min(level + 1, 10);
+      const generatedRopes = generateCrossedRopes(ropeCount, bounds);
+      
+      // Initialize positions from generated ropes
+      const positions: { [ropeId: string]: RopePosition } = {};
+      generatedRopes.forEach(rope => {
+        positions[rope.id] = {
+          startX: rope.start.x,
+          startY: rope.start.y,
+          endX: rope.end.x,
+          endY: rope.end.y,
+        };
+      });
 
-    const initialIntersections = countIntersections(generatedRopes);
+      const initialIntersections = countIntersections(generatedRopes);
 
-    set({
-      ropes: generatedRopes,
-      ropePositions: positions,
-      intersectionCount: initialIntersections,
-      isCompleted: false,
-      bounds,
-      isDragging: false,
-    });
+      set({
+        ropes: generatedRopes,
+        ropePositions: positions,
+        intersectionCount: initialIntersections,
+        isCompleted: false,
+        bounds,
+        isDragging: false,
+        isInitialized: true, // Mark as initialized
+      });
+    } catch (error) {
+      console.error('Failed to initialize level:', error);
+      // Fallback initialization
+      set({
+        ropes: [],
+        ropePositions: {},
+        intersectionCount: 0,
+        isCompleted: false,
+        bounds,
+        isDragging: false,
+        isInitialized: true,
+      });
+    }
   },
 
   updateRopePosition: (ropeId: string, position: Partial<RopePosition>) => {
@@ -134,6 +152,16 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
       const state = get();
       const level = state.ropes.length - 1; // Approximate level from rope count
       get().initializeLevel(Math.max(1, level), bounds);
+    } else {
+      // Reset to initial state if no bounds
+      set({
+        ...initialState,
+        isInitialized: false,
+      });
     }
+  },
+
+  clearAll: () => {
+    set(initialState);
   },
 }));

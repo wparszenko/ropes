@@ -43,6 +43,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     intersectionCount, 
     isCompleted,
     isDragging,
+    isInitialized,
     initializeLevel,
     updateRopePosition,
     checkIntersections 
@@ -51,6 +52,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
   // Add ref to track if level completion has been triggered
   const completionTriggeredRef = useRef(false);
   const levelRef = useRef(currentLevel);
+  const initializationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Create a fixed number of shared values at the top level
   // This ensures the number of hook calls remains constant
@@ -66,26 +68,46 @@ export default function GameBoard({ levelData }: GameBoardProps) {
 
   // Initialize level when component mounts or level changes
   useEffect(() => {
-    if (currentLevel !== levelRef.current) {
-      initializeLevel(currentLevel, GAME_BOUNDS);
-      completionTriggeredRef.current = false;
-      levelRef.current = currentLevel;
+    if (currentLevel !== levelRef.current || !isInitialized) {
+      // Clear any existing timeout
+      if (initializationTimeoutRef.current) {
+        clearTimeout(initializationTimeoutRef.current);
+      }
+
+      // Add a small delay to ensure proper initialization
+      initializationTimeoutRef.current = setTimeout(() => {
+        try {
+          initializeLevel(currentLevel, GAME_BOUNDS);
+          completionTriggeredRef.current = false;
+          levelRef.current = currentLevel;
+        } catch (error) {
+          console.error('Failed to initialize level:', error);
+        }
+      }, 100);
     }
-  }, [currentLevel, initializeLevel]);
+
+    return () => {
+      if (initializationTimeoutRef.current) {
+        clearTimeout(initializationTimeoutRef.current);
+      }
+    };
+  }, [currentLevel, initializeLevel, isInitialized]);
 
   // Update shared values when positions change
   useEffect(() => {
-    ropes.forEach((rope, index) => {
-      const position = ropePositions[rope.id];
-      const shared = sharedValues[index];
-      if (position && shared && index < MAX_ROPES) {
-        shared.startX.value = position.startX;
-        shared.startY.value = position.startY;
-        shared.endX.value = position.endX;
-        shared.endY.value = position.endY;
-      }
-    });
-  }, [ropePositions, ropes]);
+    if (isInitialized && ropes.length > 0) {
+      ropes.forEach((rope, index) => {
+        const position = ropePositions[rope.id];
+        const shared = sharedValues[index];
+        if (position && shared && index < MAX_ROPES) {
+          shared.startX.value = position.startX;
+          shared.startY.value = position.startY;
+          shared.endX.value = position.endX;
+          shared.endY.value = position.endY;
+        }
+      });
+    }
+  }, [ropePositions, ropes, isInitialized]);
 
   // Check for level completion with proper debouncing - only when not dragging
   useEffect(() => {
@@ -94,7 +116,8 @@ export default function GameBoard({ levelData }: GameBoardProps) {
       ropes.length > 0 && 
       !completionTriggeredRef.current && 
       gameState === 'playing' &&
-      !isDragging // Only complete when not dragging
+      !isDragging &&
+      isInitialized
     ) {
       completionTriggeredRef.current = true;
       
@@ -108,7 +131,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
         completeLevel(totalStars);
       }, 300); // Reduced delay for better responsiveness
     }
-  }, [isCompleted, ropes.length, currentLevel, completeLevel, intersectionCount, gameState, isDragging]);
+  }, [isCompleted, ropes.length, currentLevel, completeLevel, intersectionCount, gameState, isDragging, isInitialized]);
 
   // Reset completion trigger when game state changes back to playing
   useEffect(() => {
@@ -126,8 +149,8 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     updateRopePosition(ropeId, positionUpdate);
   }, [updateRopePosition]);
 
-  // Early return after all hooks have been called
-  if (ropes.length === 0) {
+  // Show loading state while initializing
+  if (!isInitialized || ropes.length === 0) {
     return (
       <View style={[gameBoardStyles.container, { height: BOARD_HEIGHT }]}>
         <View style={gameBoardStyles.loadingContainer}>

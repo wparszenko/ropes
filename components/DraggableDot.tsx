@@ -4,6 +4,7 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   runOnJS,
+  useSharedValue,
 } from 'react-native-reanimated';
 import {
   Gesture,
@@ -38,18 +39,27 @@ export default function DraggableDot({
   bounds = { MIN_X: 40, MAX_X: 320, MIN_Y: 40, MAX_Y: 600 }
 }: DraggableDotProps) {
   
+  // Store the starting position when gesture begins
+  const startX = useSharedValue(0);
+  const startY = useSharedValue(0);
+  
   const panGesture = Gesture.Pan()
+    .onStart(() => {
+      'worklet';
+      // Store the current position when gesture starts
+      startX.value = position.x.value;
+      startY.value = position.y.value;
+    })
     .onUpdate((event) => {
       'worklet';
-      // Apply constraints to keep dot within bounds
-      // Use current position + translation to avoid jumping
+      // Calculate new position based on starting position + translation
       const newX = clamp(
-        position.x.value + event.changeX,
+        startX.value + event.translationX,
         bounds.MIN_X,
         bounds.MAX_X
       );
       const newY = clamp(
-        position.y.value + event.changeY,
+        startY.value + event.translationY,
         bounds.MIN_Y,
         bounds.MAX_Y
       );

@@ -92,6 +92,7 @@ export default function GameScreen() {
   const gameTimerRef = useRef<GameTimer | null>(null);
   const levelStateRef = useRef(levelState);
   const levelRef = useRef(currentLevel);
+  const completionTriggeredRef = useRef(false);
 
   // Update refs when values change
   useEffect(() => {

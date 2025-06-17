@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Clock, RotateCcw, Chrome as Home, TriangleAlert as AlertTriangle } from 'lucide-react-native';
 import { router } from 'expo-router';
+import { useGameStore } from '@/store/gameStore';
 import { levelFailedModalStyles } from '@/styles/levelFailedModalStyles';
 
 interface LevelFailedModalProps {
@@ -18,6 +19,7 @@ export default function LevelFailedModal({
   onRetry,
   level,
 }: LevelFailedModalProps) {
+  const { resetLevel } = useGameStore();
 
   const handleHome = () => {
     // Immediately close modal and navigate
@@ -27,7 +29,8 @@ export default function LevelFailedModal({
 
   const handleRetry = () => {
     onClose();
-    onRetry();
+    // Reset the current level to restart from beginning
+    resetLevel();
   };
 
   return (

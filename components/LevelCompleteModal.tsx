@@ -46,7 +46,8 @@ export default function LevelCompleteModal({
 
   const handleRetry = () => {
     onClose(); // Close modal first
-    resetLevel(); // Reset the current level
+    // Reset the current level to restart from beginning
+    resetLevel();
   };
 
   const handleViewLevels = () => {

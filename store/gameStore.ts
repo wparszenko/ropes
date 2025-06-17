@@ -79,7 +79,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
         currentLevel: level, 
         gameState: 'playing', 
         portalActive: false,
-        timeRemaining: 30
+        timeRemaining: 30,
+        wireConnections: {},
+        robotPosition: { x: 100, y: 100 }
       });
     }
   },

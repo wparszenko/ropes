@@ -139,6 +139,7 @@ export default function GameScreen() {
     setShowFailedModal(false);
     modalShownForLevel.current = null;
     
+    // Reset both game and rope stores to restart the current level
     resetGameLevel();
     resetRopeLevel();
     

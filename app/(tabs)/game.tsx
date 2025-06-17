@@ -278,25 +278,28 @@ export default function GameScreen() {
   };
 
   const handleReset = () => {
-    console.log('Reset button clicked');
+    console.log('Reset button clicked - restarting level with fresh ropes');
     
     // Stop timer during reset
     gameTimerRef.current?.stop();
 
+    // Close any open modals
     modalClosingRef.current = true;
     setShowCompleteModal(false);
     setShowFailedModal(false);
     modalShownForLevel.current = null;
     completionTriggeredRef.current = false;
     
-    // Clean up current rope data before reset
+    // Clean up current rope data completely
     cleanupLevel();
     
-    // Reset both game and rope stores to restart the current level
+    // Reset game state to fresh
     resetGameLevel(); // This sets levelState to 'fresh'
-    resetRopeLevel(); // This will generate fresh ropes
     
+    // Small delay to ensure cleanup is complete, then reset ropes
     setTimeout(() => {
+      console.log('Generating fresh ropes for level', currentLevel);
+      resetRopeLevel(); // This will generate completely new ropes
       modalClosingRef.current = false;
       // The level will auto-start due to the useEffect above
     }, 200);

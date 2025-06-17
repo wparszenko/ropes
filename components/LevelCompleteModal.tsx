@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Star, ArrowRight, Chrome as Home, RotateCcw } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useGameStore } from '@/store/gameStore';
+import { useRopeStore } from '@/store/ropeStore';
 import { levelCompleteModalStyles } from '@/styles/levelCompleteModalStyles';
 
 interface LevelCompleteModalProps {
@@ -24,6 +25,7 @@ export default function LevelCompleteModal({
   completionTime = 0,
 }: LevelCompleteModalProps) {
   const { setCurrentLevel, isLevelUnlocked, resetLevel } = useGameStore();
+  const { cleanupLevel, resetLevel: resetRopeLevel } = useRopeStore();
   const nextLevel = level + 1;
   const hasNextLevel = isLevelUnlocked(nextLevel);
 
@@ -45,9 +47,21 @@ export default function LevelCompleteModal({
   };
 
   const handleRetry = () => {
+    console.log('Retry button clicked from completion modal - restarting level with fresh ropes');
+    
     onClose(); // Close modal first
+    
+    // Clean up current rope data completely
+    cleanupLevel();
+    
     // Reset the current level to restart from beginning
-    resetLevel();
+    resetLevel(); // This sets levelState to 'fresh'
+    
+    // Small delay to ensure cleanup is complete, then reset ropes
+    setTimeout(() => {
+      console.log('Generating fresh ropes for retry of level', level);
+      resetRopeLevel(); // This will generate completely new ropes
+    }, 200);
   };
 
   const handleViewLevels = () => {

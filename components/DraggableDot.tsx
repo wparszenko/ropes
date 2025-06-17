@@ -16,6 +16,7 @@ interface DraggableDotProps {
     x: Animated.SharedValue<number>;
     y: Animated.SharedValue<number>;
   };
+  onDragEnd?: () => void;
 }
 
 // Clamp function to constrain values within bounds
@@ -24,7 +25,7 @@ const clamp = (value: number, min: number, max: number) => {
   return Math.min(Math.max(value, min), max);
 };
 
-export default function DraggableDot({ position }: DraggableDotProps) {
+export default function DraggableDot({ position, onDragEnd }: DraggableDotProps) {
   // Store initial position for gesture
   const startPosition = { x: 0, y: 0 };
 
@@ -62,6 +63,9 @@ export default function DraggableDot({ position }: DraggableDotProps) {
         damping: 15,
         stiffness: 150,
       });
+      if (onDragEnd) {
+        runOnJS(onDragEnd)();
+      }
     });
 
   const animatedStyle = useAnimatedStyle(() => {

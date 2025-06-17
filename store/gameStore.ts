@@ -97,7 +97,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   completeLevel: (stars: number) => {
-    const { currentLevel, playerStats, getMaxStarsForLevel } = get();
+    const { currentLevel, playerStats, getMaxStarsForLevel, gameState } = get();
+    
+    // Only complete if currently playing to prevent multiple completions
+    if (gameState !== 'playing') return;
+    
     const maxStars = getMaxStarsForLevel(currentLevel);
     const actualStars = Math.min(stars, maxStars);
     
@@ -124,7 +128,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   failLevel: () => {
     const { gameState } = get();
-    // Only fail if currently playing
+    // Only fail if currently playing to prevent multiple failures
     if (gameState === 'playing') {
       set({ gameState: 'failed' });
     }
@@ -247,12 +251,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   decrementTime: () => {
     const { timeRemaining, gameState, failLevel } = get();
+    
+    // Only decrement if currently playing
     if (gameState === 'playing' && timeRemaining > 0) {
       const newTime = timeRemaining - 1;
       set({ timeRemaining: newTime });
       
-      // Fail level when time runs out
-      if (newTime <= 0) {
+      // Fail level when time runs out, but only if still playing
+      if (newTime <= 0 && get().gameState === 'playing') {
         failLevel();
       }
     }

@@ -49,7 +49,7 @@ export default function GameScreen() {
     setLevelData(data);
   }, [currentLevel]);
 
-  // Enhanced timer effect that continues during drag operations
+  // Enhanced timer effect - stops when level is completed or failed
   useEffect(() => {
     // Clear any existing timer
     if (timerRef.current) {
@@ -57,14 +57,26 @@ export default function GameScreen() {
       timerRef.current = null;
     }
 
+    // Only start timer if game is actively playing
     if (gameState === 'playing') {
-      // Start timer - runs continuously regardless of drag state
       timerRef.current = setInterval(() => {
-        // Use a callback to ensure we get the latest state
-        decrementTime();
+        // Check current game state before decrementing
+        const currentGameState = gameStateRef.current;
+        
+        // Only decrement if still playing
+        if (currentGameState === 'playing') {
+          decrementTime();
+        } else {
+          // Stop timer if game state changed
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+        }
       }, 1000);
     }
 
+    // Cleanup timer when game state changes or component unmounts
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -72,6 +84,14 @@ export default function GameScreen() {
       }
     };
   }, [gameState, decrementTime]);
+
+  // Stop timer immediately when game state changes from playing
+  useEffect(() => {
+    if (gameState !== 'playing' && timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, [gameState]);
 
   // Handle level completion with new star system
   useEffect(() => {
@@ -81,6 +101,12 @@ export default function GameScreen() {
       !modalClosingRef.current &&
       modalShownForLevel.current !== currentLevel
     ) {
+      // Stop timer immediately on completion
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+
       const timeElapsed = 30 - timeRemaining;
       setCompletionTime(timeElapsed);
       
@@ -107,7 +133,7 @@ export default function GameScreen() {
     }
   }, [gameState, showCompleteModal, currentLevel, timeRemaining, completeLevel]);
 
-  // Handle level failure - only show when actually playing
+  // Handle level failure - only show when actually playing and stop timer
   useEffect(() => {
     if (
       gameState === 'failed' && 
@@ -115,6 +141,12 @@ export default function GameScreen() {
       !modalClosingRef.current &&
       modalShownForLevel.current !== currentLevel
     ) {
+      // Stop timer immediately on failure
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+
       setShowFailedModal(true);
       modalShownForLevel.current = currentLevel;
     }
@@ -127,13 +159,40 @@ export default function GameScreen() {
     setShowFailedModal(false);
     modalClosingRef.current = false;
     setTimeRemaining(30); // Reset timer for new level
+    
+    // Clear any existing timer when level changes
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
   }, [currentLevel, setTimeRemaining]);
 
+  // Cleanup timer on component unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, []);
+
   const handleBack = () => {
+    // Stop timer when leaving game
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     router.back();
   };
 
   const handleReset = () => {
+    // Stop timer during reset
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
     modalClosingRef.current = true;
     setShowCompleteModal(false);
     setShowFailedModal(false);
@@ -158,6 +217,11 @@ export default function GameScreen() {
   };
 
   const handleHome = () => {
+    // Stop timer when going home
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     router.push('/');
   };
 

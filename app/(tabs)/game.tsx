@@ -12,12 +12,13 @@ import { gameScreenStyles } from '@/styles/gameScreenStyles';
 
 const { width, height } = Dimensions.get('window');
 
-// Timer class for better instance management
+// Enhanced timer class with better memory management
 class GameTimer {
   private intervalId: NodeJS.Timeout | null = null;
   private isRunning: boolean = false;
   private onTick: () => void;
   private onComplete: () => void;
+  private destroyed: boolean = false;
 
   constructor(onTick: () => void, onComplete: () => void) {
     this.onTick = onTick;
@@ -25,14 +26,24 @@ class GameTimer {
   }
 
   start() {
+    if (this.destroyed) {
+      console.warn('Attempted to start destroyed timer');
+      return;
+    }
+    
     if (this.isRunning) {
       this.stop(); // Stop existing timer first
     }
     
     this.isRunning = true;
     this.intervalId = setInterval(() => {
-      if (this.isRunning) {
-        this.onTick();
+      if (this.isRunning && !this.destroyed) {
+        try {
+          this.onTick();
+        } catch (error) {
+          console.error('Timer tick error:', error);
+          this.stop();
+        }
       }
     }, 1000);
   }
@@ -47,12 +58,18 @@ class GameTimer {
 
   destroy() {
     this.stop();
+    this.destroyed = true;
+    // Clear references to prevent memory leaks
     this.onTick = () => {};
     this.onComplete = () => {};
   }
 
   getIsRunning() {
-    return this.isRunning;
+    return this.isRunning && !this.destroyed;
+  }
+
+  isDestroyed() {
+    return this.destroyed;
   }
 }
 
@@ -91,13 +108,14 @@ export default function GameScreen() {
   const [modalStars, setModalStars] = useState(0);
   const [completionTime, setCompletionTime] = useState(0);
   
-  // Add ref to track if modal has been shown for current level
+  // Enhanced refs for better memory management
   const modalShownForLevel = useRef<number | null>(null);
   const modalClosingRef = useRef(false);
   const gameTimerRef = useRef<GameTimer | null>(null);
   const levelStateRef = useRef(levelState);
   const levelRef = useRef(currentLevel);
   const completionTriggeredRef = useRef(false);
+  const componentMounted = useRef(true);
 
   // Update refs when values change
   useEffect(() => {
@@ -108,33 +126,53 @@ export default function GameScreen() {
     levelRef.current = currentLevel;
   }, [currentLevel]);
 
-  // Timer tick handler
+  // Enhanced timer tick handler with error handling
   const handleTimerTick = useCallback(() => {
-    // Check if level is still playing before decrementing
-    if (levelStateRef.current === 'playing') {
-      decrementTime();
-    } else {
-      // Stop timer if level state changed
+    if (!componentMounted.current) return;
+    
+    try {
+      // Check if level is still playing before decrementing
+      if (levelStateRef.current === 'playing') {
+        decrementTime();
+      } else {
+        // Stop timer if level state changed
+        gameTimerRef.current?.stop();
+      }
+    } catch (error) {
+      console.error('Timer tick error:', error);
       gameTimerRef.current?.stop();
     }
   }, [decrementTime]);
 
-  // Timer complete handler (when time reaches 0)
+  // Enhanced timer complete handler with error handling
   const handleTimerComplete = useCallback(() => {
-    if (levelStateRef.current === 'playing') {
-      failLevel();
+    if (!componentMounted.current) return;
+    
+    try {
+      if (levelStateRef.current === 'playing') {
+        failLevel();
+      }
+    } catch (error) {
+      console.error('Timer complete error:', error);
     }
   }, [failLevel]);
 
-  // Initialize timer instance
+  // Initialize timer instance with proper cleanup
   useEffect(() => {
-    // Create timer instance
+    // Destroy existing timer if any
+    if (gameTimerRef.current) {
+      gameTimerRef.current.destroy();
+    }
+    
+    // Create new timer instance
     gameTimerRef.current = new GameTimer(handleTimerTick, handleTimerComplete);
 
     // Cleanup on unmount
     return () => {
-      gameTimerRef.current?.destroy();
-      gameTimerRef.current = null;
+      if (gameTimerRef.current) {
+        gameTimerRef.current.destroy();
+        gameTimerRef.current = null;
+      }
     };
   }, [handleTimerTick, handleTimerComplete]);
 
@@ -166,7 +204,7 @@ export default function GameScreen() {
   // Start timer when level state becomes 'playing'
   useEffect(() => {
     const timer = gameTimerRef.current;
-    if (!timer) return;
+    if (!timer || timer.isDestroyed()) return;
 
     if (levelState === 'playing') {
       // Start timer when level is playing
@@ -183,10 +221,14 @@ export default function GameScreen() {
   useEffect(() => {
     if (levelState === 'fresh' && ropes.length > 0) {
       // Small delay to ensure everything is initialized
-      setTimeout(() => {
-        console.log('Auto-starting fresh level', currentLevel);
-        startLevel();
+      const startTimeout = setTimeout(() => {
+        if (componentMounted.current) {
+          console.log('Auto-starting fresh level', currentLevel);
+          startLevel();
+        }
       }, 500);
+      
+      return () => clearTimeout(startTimeout);
     }
   }, [levelState, ropes.length, currentLevel, startLevel]);
 
@@ -201,7 +243,8 @@ export default function GameScreen() {
       isInitialized &&
       !showCompleteModal &&
       !modalClosingRef.current &&
-      modalShownForLevel.current !== currentLevel
+      modalShownForLevel.current !== currentLevel &&
+      componentMounted.current
     ) {
       console.log('Level completed! Showing completion modal');
       completionTriggeredRef.current = true;
@@ -246,7 +289,8 @@ export default function GameScreen() {
       levelState === 'failed' && 
       !showFailedModal && 
       !modalClosingRef.current &&
-      modalShownForLevel.current !== currentLevel
+      modalShownForLevel.current !== currentLevel &&
+      componentMounted.current
     ) {
       // Stop timer immediately on failure
       gameTimerRef.current?.stop();
@@ -256,18 +300,31 @@ export default function GameScreen() {
     }
   }, [levelState, showFailedModal, currentLevel]);
 
-  // Cleanup when leaving the game screen
+  // Enhanced cleanup when leaving the game screen
   useEffect(() => {
+    componentMounted.current = true;
+    
     return () => {
       console.log('Game screen unmounting, cleaning up timer and rope data');
-      gameTimerRef.current?.destroy();
-      cleanupLevel(); // Clean up rope data when leaving game
+      componentMounted.current = false;
+      
+      // Destroy timer
+      if (gameTimerRef.current) {
+        gameTimerRef.current.destroy();
+        gameTimerRef.current = null;
+      }
+      
+      // Clean up rope data when leaving game
+      cleanupLevel();
     };
   }, [cleanupLevel]);
 
   const handleBack = () => {
     // Stop and destroy timer when leaving game
-    gameTimerRef.current?.stop();
+    if (gameTimerRef.current) {
+      gameTimerRef.current.destroy();
+      gameTimerRef.current = null;
+    }
     // Clean up rope data to prevent memory leaks
     cleanupLevel();
     router.back();
@@ -293,12 +350,16 @@ export default function GameScreen() {
     resetGameLevel(); // This sets levelState to 'fresh'
     
     // Small delay to ensure cleanup is complete, then reset ropes
-    setTimeout(() => {
-      console.log('Generating fresh ropes for level', currentLevel);
-      resetRopeLevel(); // This will generate completely new ropes
-      modalClosingRef.current = false;
-      // The level will auto-start due to the useEffect above
+    const resetTimeout = setTimeout(() => {
+      if (componentMounted.current) {
+        console.log('Generating fresh ropes for level', currentLevel);
+        resetRopeLevel(); // This will generate completely new ropes
+        modalClosingRef.current = false;
+        // The level will auto-start due to the useEffect above
+      }
     }, 200);
+    
+    return () => clearTimeout(resetTimeout);
   };
 
   const handleHint = () => {
@@ -315,7 +376,10 @@ export default function GameScreen() {
 
   const handleHome = () => {
     // Stop and destroy timer when going home
-    gameTimerRef.current?.stop();
+    if (gameTimerRef.current) {
+      gameTimerRef.current.destroy();
+      gameTimerRef.current = null;
+    }
     // Clean up rope data to prevent memory leaks
     cleanupLevel();
     router.push('/');
@@ -330,9 +394,13 @@ export default function GameScreen() {
     // Clean up current level data before moving to next
     cleanupLevel();
     
-    setTimeout(() => {
-      modalClosingRef.current = false;
+    const nextTimeout = setTimeout(() => {
+      if (componentMounted.current) {
+        modalClosingRef.current = false;
+      }
     }, 200);
+    
+    return () => clearTimeout(nextTimeout);
   };
 
   const handleCloseModal = () => {
@@ -346,9 +414,13 @@ export default function GameScreen() {
     completionTriggeredRef.current = false;
     
     // Reset the closing flag after a delay
-    setTimeout(() => {
-      modalClosingRef.current = false;
+    const closeTimeout = setTimeout(() => {
+      if (componentMounted.current) {
+        modalClosingRef.current = false;
+      }
     }, 500);
+    
+    return () => clearTimeout(closeTimeout);
   };
 
   const formatTime = (seconds: number) => {

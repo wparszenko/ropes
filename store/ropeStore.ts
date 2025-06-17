@@ -44,11 +44,46 @@ const initialState: RopeState = {
   currentLevel: 0,
 };
 
-// Performance optimization: Debounce intersection checks
-let intersectionCheckTimeout: NodeJS.Timeout | null = null;
+// Global timeout management to prevent memory leaks
+class TimeoutManager {
+  private timeouts: Set<NodeJS.Timeout> = new Set();
+  
+  setTimeout(callback: () => void, delay: number): NodeJS.Timeout {
+    const timeout = setTimeout(() => {
+      this.timeouts.delete(timeout);
+      callback();
+    }, delay);
+    this.timeouts.add(timeout);
+    return timeout;
+  }
+  
+  clearTimeout(timeout: NodeJS.Timeout | null) {
+    if (timeout) {
+      clearTimeout(timeout);
+      this.timeouts.delete(timeout);
+    }
+  }
+  
+  clearAll() {
+    this.timeouts.forEach(timeout => clearTimeout(timeout));
+    this.timeouts.clear();
+  }
+  
+  getActiveCount() {
+    return this.timeouts.size;
+  }
+}
+
+// Global timeout manager instance
+const timeoutManager = new TimeoutManager();
+
+// Performance optimization: Advanced debouncing with request animation frame
+let intersectionCheckFrame: number | null = null;
 let lastIntersectionCheck = 0;
-const INTERSECTION_CHECK_DEBOUNCE = 100; // ms
-const MIN_CHECK_INTERVAL = 50; // ms
+const MIN_CHECK_INTERVAL = 100; // Increased from 50ms for better performance
+
+// Cached intersection results to avoid recalculation
+let cachedIntersectionResult: { ropes: string, count: number } | null = null;
 
 export const useRopeStore = create<RopeStore>((set, get) => ({
   ...initialState,
@@ -86,6 +121,9 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
       });
 
       const initialIntersections = countIntersections(generatedRopes);
+
+      // Clear cache
+      cachedIntersectionResult = null;
 
       // Set completely fresh state
       set({
@@ -150,17 +188,21 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
 
     set({ ropePositions: newPositions });
     
-    // Performance optimization: Debounced intersection checking
+    // Clear cache when positions change
+    cachedIntersectionResult = null;
+    
+    // Performance optimization: Use requestAnimationFrame for intersection checking
     const now = Date.now();
     if (state.dragCount === 0 && now - lastIntersectionCheck > MIN_CHECK_INTERVAL) {
-      if (intersectionCheckTimeout) {
-        clearTimeout(intersectionCheckTimeout);
+      if (intersectionCheckFrame) {
+        cancelAnimationFrame(intersectionCheckFrame);
       }
       
-      intersectionCheckTimeout = setTimeout(() => {
+      intersectionCheckFrame = requestAnimationFrame(() => {
         lastIntersectionCheck = Date.now();
         get().checkIntersections();
-      }, INTERSECTION_CHECK_DEBOUNCE);
+        intersectionCheckFrame = null;
+      });
     }
   },
 
@@ -173,8 +215,18 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
     }
     
     const currentRopes = get().getCurrentRopes();
+    
+    // Use cached result if ropes haven't changed
+    const ropeSignature = currentRopes.map(r => `${r.id}:${r.start.x},${r.start.y},${r.end.x},${r.end.y}`).join('|');
+    if (cachedIntersectionResult && cachedIntersectionResult.ropes === ropeSignature) {
+      return cachedIntersectionResult.count;
+    }
+    
     const newIntersectionCount = countIntersections(currentRopes);
     const isCompleted = newIntersectionCount === 0 && currentRopes.length > 0 && state.dragCount === 0;
+
+    // Cache the result
+    cachedIntersectionResult = { ropes: ropeSignature, count: newIntersectionCount };
 
     // Only update state if values actually changed
     if (newIntersectionCount !== state.intersectionCount || isCompleted !== state.isCompleted) {
@@ -222,12 +274,12 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
     // Performance optimization: Only check intersections when all dragging ends
     if (newDragCount === 0) {
       // Clear any pending intersection checks
-      if (intersectionCheckTimeout) {
-        clearTimeout(intersectionCheckTimeout);
+      if (intersectionCheckFrame) {
+        cancelAnimationFrame(intersectionCheckFrame);
       }
       
-      // Immediate check when dragging stops
-      setTimeout(() => {
+      // Use timeout manager for proper cleanup
+      timeoutManager.setTimeout(() => {
         get().checkIntersections();
       }, 50);
     }
@@ -258,9 +310,10 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
   resetLevel: () => {
     console.log('Resetting rope level');
     
-    // Clear any pending intersection checks
-    if (intersectionCheckTimeout) {
-      clearTimeout(intersectionCheckTimeout);
+    // Clear all pending operations
+    if (intersectionCheckFrame) {
+      cancelAnimationFrame(intersectionCheckFrame);
+      intersectionCheckFrame = null;
     }
     
     const { bounds, currentLevel } = get();
@@ -277,14 +330,20 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
   cleanupLevel: () => {
     console.log('Cleaning up level data to prevent memory leaks');
     
-    // Clear any pending intersection checks
-    if (intersectionCheckTimeout) {
-      clearTimeout(intersectionCheckTimeout);
-      intersectionCheckTimeout = null;
+    // Clear all pending operations
+    if (intersectionCheckFrame) {
+      cancelAnimationFrame(intersectionCheckFrame);
+      intersectionCheckFrame = null;
     }
+    
+    // Clear all managed timeouts
+    timeoutManager.clearAll();
     
     // Reset timing variables
     lastIntersectionCheck = 0;
+    
+    // Clear cache
+    cachedIntersectionResult = null;
     
     // Clear all rope data
     set({
@@ -301,18 +360,25 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
     if (typeof global !== 'undefined' && global.gc) {
       global.gc();
     }
+    
+    console.log(`Cleanup complete. Active timeouts: ${timeoutManager.getActiveCount()}`);
   },
 
   clearAll: () => {
     console.log('Clearing all rope data');
     
-    // Clear any pending intersection checks
-    if (intersectionCheckTimeout) {
-      clearTimeout(intersectionCheckTimeout);
-      intersectionCheckTimeout = null;
+    // Clear all pending operations
+    if (intersectionCheckFrame) {
+      cancelAnimationFrame(intersectionCheckFrame);
+      intersectionCheckFrame = null;
     }
     
+    // Clear all managed timeouts
+    timeoutManager.clearAll();
+    
     lastIntersectionCheck = 0;
+    cachedIntersectionResult = null;
+    
     get().cleanupLevel();
     set(initialState);
   },

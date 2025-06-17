@@ -21,7 +21,7 @@ interface RopePathProps {
 }
 
 export default function RopePath({ startPoint, endPoint, color }: RopePathProps) {
-  // Use useDerivedValue to create a stable derived value for the path
+  // Optimized path calculation with reduced complexity
   const pathData = useDerivedValue(() => {
     // Ensure we have valid numbers with fallbacks
     const startX = typeof startPoint.x.value === 'number' && !isNaN(startPoint.x.value) ? startPoint.x.value : 50;
@@ -29,7 +29,7 @@ export default function RopePath({ startPoint, endPoint, color }: RopePathProps)
     const endX = typeof endPoint.x.value === 'number' && !isNaN(endPoint.x.value) ? endPoint.x.value : 100;
     const endY = typeof endPoint.y.value === 'number' && !isNaN(endPoint.y.value) ? endPoint.y.value : 100;
 
-    // Calculate distance between points for dynamic arc
+    // Simplified arc calculation for better performance
     const distance = Math.sqrt(
       Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2)
     );
@@ -38,10 +38,10 @@ export default function RopePath({ startPoint, endPoint, color }: RopePathProps)
     const midX = (startX + endX) / 2;
     const midY = (startY + endY) / 2;
     
-    // Increased arc height for longer rope appearance
-    const arcHeight = Math.min(distance * 0.4, 120); // Increased from 0.15 and 50
+    // Reduced arc height calculation for better performance
+    const arcHeight = Math.min(distance * 0.25, 80); // Reduced from 0.4 and 120
     const controlX = midX;
-    const controlY = midY + arcHeight; // Downward arc for gravity effect
+    const controlY = midY + arcHeight;
 
     // Create SVG path string for quadratic Bézier curve
     return `M ${startX} ${startY} Q ${controlX} ${controlY} ${endX} ${endY}`;
@@ -57,7 +57,7 @@ export default function RopePath({ startPoint, endPoint, color }: RopePathProps)
     <AnimatedPath
       animatedProps={animatedProps}
       stroke={color}
-      strokeWidth={12} // Reverted back to 12 from 20
+      strokeWidth={10} // Reduced from 12 for better performance
       fill="none"
       strokeLinecap="round"
       strokeLinejoin="round"

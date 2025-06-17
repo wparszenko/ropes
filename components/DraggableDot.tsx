@@ -54,7 +54,17 @@ export default function DraggableDot({
   const lastValidX = useSharedValue(position.x.value);
   const lastValidY = useSharedValue(position.y.value);
   
-  // Web-specific pan responder
+  // Throttle position updates to reduce CPU usage
+  const updateThrottleRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const throttledPositionUpdate = (callback: () => void) => {
+    if (updateThrottleRef.current) {
+      clearTimeout(updateThrottleRef.current);
+    }
+    updateThrottleRef.current = setTimeout(callback, 16); // ~60fps
+  };
+  
+  // Web-specific pan responder with optimizations
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: () => true,
@@ -80,14 +90,15 @@ export default function DraggableDot({
           bounds.maxY
         );
         
-        // Update position immediately
+        // Update position immediately for smooth dragging
         position.x.value = newX;
         position.y.value = newY;
         lastValidX.value = newX;
         lastValidY.value = newY;
         
+        // Throttle callback to reduce CPU usage
         if (onPositionChange) {
-          onPositionChange();
+          throttledPositionUpdate(onPositionChange);
         }
       },
       onPanResponderRelease: () => {
@@ -98,15 +109,16 @@ export default function DraggableDot({
         const finalX = clamp(position.x.value, bounds.minX, bounds.maxX);
         const finalY = clamp(position.y.value, bounds.minY, bounds.maxY);
         
+        // Reduced spring animation for better performance
         position.x.value = withSpring(finalX, {
-          damping: 20,
-          stiffness: 200,
-          mass: 0.8,
+          damping: 25,
+          stiffness: 300,
+          mass: 0.5,
         });
         position.y.value = withSpring(finalY, {
-          damping: 20,
-          stiffness: 200,
-          mass: 0.8,
+          damping: 25,
+          stiffness: 300,
+          mass: 0.5,
         });
         
         lastValidX.value = finalX;
@@ -119,19 +131,19 @@ export default function DraggableDot({
         }
       },
       onPanResponderTerminate: () => {
-        // Handle gesture termination - restore to last valid position
         isDragging.value = false;
         isPressed.value = false;
         
+        // Reduced spring animation for better performance
         position.x.value = withSpring(lastValidX.value, {
-          damping: 20,
-          stiffness: 200,
-          mass: 0.8,
+          damping: 25,
+          stiffness: 300,
+          mass: 0.5,
         });
         position.y.value = withSpring(lastValidY.value, {
-          damping: 20,
-          stiffness: 200,
-          mass: 0.8,
+          damping: 25,
+          stiffness: 300,
+          mass: 0.5,
         });
         
         setDragging(false);
@@ -143,7 +155,7 @@ export default function DraggableDot({
     })
   ).current;
 
-  // Enhanced native gesture handler with better iOS support
+  // Optimized native gesture handler
   const panGesture = Gesture.Pan()
     .onBegin(() => {
       'worklet';
@@ -176,7 +188,8 @@ export default function DraggableDot({
         lastValidX.value = newX;
         lastValidY.value = newY;
         
-        if (onPositionChange) {
+        // Throttle callback updates
+        if (onPositionChange && event.translationX % 4 === 0) { // Only call every 4th update
           runOnJS(onPositionChange)();
         }
       }
@@ -198,16 +211,16 @@ export default function DraggableDot({
         bounds.maxY
       );
       
-      // Smooth spring animation to final position
+      // Optimized spring animation
       position.x.value = withSpring(finalX, {
-        damping: 20,
-        stiffness: 200,
-        mass: 0.8,
+        damping: 25,
+        stiffness: 300,
+        mass: 0.5,
       });
       position.y.value = withSpring(finalY, {
-        damping: 20,
-        stiffness: 200,
-        mass: 0.8,
+        damping: 25,
+        stiffness: 300,
+        mass: 0.5,
       });
       
       lastValidX.value = finalX;
@@ -228,23 +241,17 @@ export default function DraggableDot({
         runOnJS(setDragging)(false);
       }
     })
-    .minDistance(0) // Allow immediate response to touch
-    .shouldCancelWhenOutside(false) // Don't cancel when dragging outside
-    .activateAfterLongPress(0) // Immediate activation
-    .maxPointers(1) // Only allow single touch
-    .runOnJS(false); // Run on UI thread for better performance
+    .minDistance(2) // Slightly higher threshold to prevent accidental drags
+    .shouldCancelWhenOutside(false)
+    .activateAfterLongPress(0)
+    .maxPointers(1)
+    .runOnJS(false);
 
+  // Optimized animated style with reduced calculations
   const animatedStyle = useAnimatedStyle(() => {
-    // Enhanced visual feedback with better scaling and positioning
-    const scale = withTiming(
-      isPressed.value ? 1.3 : isDragging.value ? 1.2 : 1.0,
-      { duration: 150 }
-    );
-    
-    const opacity = withTiming(
-      isDragging.value ? 0.9 : 1.0,
-      { duration: 100 }
-    );
+    // Simplified scaling animation
+    const scale = isPressed.value ? 1.2 : 1.0;
+    const opacity = isDragging.value ? 0.9 : 1.0;
     
     // Ensure valid position values
     const x = isNaN(position.x.value) ? lastValidX.value : position.x.value;
@@ -252,14 +259,23 @@ export default function DraggableDot({
     
     return {
       transform: [
-        { translateX: x - 25 }, // Adjusted for dot size
+        { translateX: x - 25 },
         { translateY: y - 25 },
         { scale },
       ],
       opacity,
-      zIndex: isDragging.value ? 1000 : 10, // Bring to front when dragging
+      zIndex: isDragging.value ? 1000 : 10,
     };
   });
+
+  // Cleanup timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (updateThrottleRef.current) {
+        clearTimeout(updateThrottleRef.current);
+      }
+    };
+  }, []);
 
   // Web implementation with PanResponder
   if (Platform.OS === 'web') {

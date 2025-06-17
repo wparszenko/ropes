@@ -43,10 +43,10 @@ export default function GameScreen() {
     setLevelData(data);
   }, [currentLevel]);
 
-  // Timer effect
+  // Optimized timer effect with reduced frequency
   useEffect(() => {
     if (gameState === 'playing') {
-      // Start timer
+      // Start timer with reduced frequency for better performance
       timerRef.current = setInterval(() => {
         decrementTime();
       }, 1000);

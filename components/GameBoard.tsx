@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useRef } from 'react';
+import React, { useEffect, useCallback, useRef, useMemo } from 'react';
 import { View, Text, Dimensions, Platform } from 'react-native';
 import { Svg } from 'react-native-svg';
 import { useSharedValue } from 'react-native-reanimated';
@@ -15,7 +15,7 @@ const { width, height } = Dimensions.get('window');
 // Calculate responsive game board dimensions
 const BOARD_MARGIN = 16;
 const BOARD_PADDING = 30;
-const DOT_RADIUS = 25; // Increased for better touch target
+const DOT_RADIUS = 25;
 
 // Make the game board much taller and more responsive
 const BOARD_WIDTH = width - (BOARD_MARGIN * 2);
@@ -55,18 +55,21 @@ export default function GameBoard({ levelData }: GameBoardProps) {
   const levelRef = useRef(currentLevel);
   const initializationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const positionUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const intersectionCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Create a fixed number of shared values at the top level
-  // This ensures the number of hook calls remains constant
-  const sharedValues = [];
-  for (let i = 0; i < MAX_ROPES; i++) {
-    sharedValues.push({
-      startX: useSharedValue(0),
-      startY: useSharedValue(0),
-      endX: useSharedValue(0),
-      endY: useSharedValue(0),
-    });
-  }
+  // Create a fixed number of shared values at the top level with memoization
+  const sharedValues = useMemo(() => {
+    const values = [];
+    for (let i = 0; i < MAX_ROPES; i++) {
+      values.push({
+        startX: useSharedValue(0),
+        startY: useSharedValue(0),
+        endX: useSharedValue(0),
+        endY: useSharedValue(0),
+      });
+    }
+    return values;
+  }, []); // Empty dependency array - only create once
 
   // Initialize level when component mounts or level changes
   useEffect(() => {
@@ -95,7 +98,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     };
   }, [currentLevel, initializeLevel, isInitialized]);
 
-  // Update shared values when positions change with validation
+  // Optimized position updates with reduced frequency
   useEffect(() => {
     if (isInitialized && ropes.length > 0) {
       // Clear any pending position update
@@ -103,10 +106,12 @@ export default function GameBoard({ levelData }: GameBoardProps) {
         clearTimeout(positionUpdateTimeoutRef.current);
       }
 
-      // Batch position updates to prevent rapid changes
+      // Reduce update frequency to improve performance
       positionUpdateTimeoutRef.current = setTimeout(() => {
-        // Validate positions first
-        validatePositions();
+        // Only validate positions if not dragging to reduce CPU usage
+        if (!isDragging) {
+          validatePositions();
+        }
         
         ropes.forEach((rope, index) => {
           const position = ropePositions[rope.id];
@@ -124,7 +129,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
             shared.endY.value = endY;
           }
         });
-      }, 16); // ~60fps update rate
+      }, isDragging ? 32 : 16); // Slower updates when dragging, faster when not
     }
 
     return () => {
@@ -132,9 +137,9 @@ export default function GameBoard({ levelData }: GameBoardProps) {
         clearTimeout(positionUpdateTimeoutRef.current);
       }
     };
-  }, [ropePositions, ropes, isInitialized, validatePositions]);
+  }, [ropePositions, ropes, isInitialized, validatePositions, isDragging]);
 
-  // Check for level completion with proper debouncing - only when not dragging
+  // Optimized level completion check with debouncing
   useEffect(() => {
     if (
       isCompleted && 
@@ -146,15 +151,17 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     ) {
       completionTriggeredRef.current = true;
       
+      // Debounce completion to prevent multiple triggers
       setTimeout(() => {
-        // Calculate stars based on performance
-        const baseStars = 1;
-        const timeBonus = intersectionCount === 0 ? 1 : 0; // Bonus for perfect solution
-        const efficiencyBonus = currentLevel <= 3 ? 1 : currentLevel <= 6 ? 2 : 3; // Progressive bonus
-        
-        const totalStars = Math.min(baseStars + timeBonus + efficiencyBonus, 4); // Max 4 stars
-        completeLevel(totalStars);
-      }, 300); // Reduced delay for better responsiveness
+        if (completionTriggeredRef.current) {
+          const baseStars = 1;
+          const timeBonus = intersectionCount === 0 ? 1 : 0;
+          const efficiencyBonus = currentLevel <= 3 ? 1 : currentLevel <= 6 ? 2 : 3;
+          
+          const totalStars = Math.min(baseStars + timeBonus + efficiencyBonus, 4);
+          completeLevel(totalStars);
+        }
+      }, 200); // Reduced delay
     }
   }, [isCompleted, ropes.length, currentLevel, completeLevel, intersectionCount, gameState, isDragging, isInitialized]);
 
@@ -165,8 +172,13 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     }
   }, [gameState]);
 
-  // Enhanced position change handler with validation
+  // Optimized position change handler with throttling
   const handlePositionChange = useCallback((ropeId: string, endpoint: 'start' | 'end', sharedX: any, sharedY: any) => {
+    // Clear any pending intersection check
+    if (intersectionCheckTimeoutRef.current) {
+      clearTimeout(intersectionCheckTimeoutRef.current);
+    }
+
     // Validate shared values before using them
     const x = isNaN(sharedX.value) ? GAME_BOUNDS.minX + 50 : sharedX.value;
     const y = isNaN(sharedY.value) ? GAME_BOUNDS.minY + 50 : sharedY.value;
@@ -176,7 +188,29 @@ export default function GameBoard({ levelData }: GameBoardProps) {
       : { endX: x, endY: y };
     
     updateRopePosition(ropeId, positionUpdate);
-  }, [updateRopePosition]);
+
+    // Throttle intersection checks to reduce CPU usage
+    intersectionCheckTimeoutRef.current = setTimeout(() => {
+      if (!isDragging) {
+        checkIntersections();
+      }
+    }, 100);
+  }, [updateRopePosition, isDragging, checkIntersections]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (initializationTimeoutRef.current) {
+        clearTimeout(initializationTimeoutRef.current);
+      }
+      if (positionUpdateTimeoutRef.current) {
+        clearTimeout(positionUpdateTimeoutRef.current);
+      }
+      if (intersectionCheckTimeoutRef.current) {
+        clearTimeout(intersectionCheckTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Show loading state while initializing
   if (!isInitialized || ropes.length === 0) {

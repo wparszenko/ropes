@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, TouchableOpacity, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Star, ArrowRight, Chrome as Home, RotateCcw } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { useGameStore } from '@/store/gameStore';
 import { levelCompleteModalStyles } from '@/styles/levelCompleteModalStyles';
 
 interface LevelCompleteModalProps {
@@ -19,6 +21,33 @@ export default function LevelCompleteModal({
   stars,
   level,
 }: LevelCompleteModalProps) {
+  const { getMaxStarsForLevel, setCurrentLevel, isLevelUnlocked } = useGameStore();
+  const maxStars = getMaxStarsForLevel(level);
+  const nextLevel = level + 1;
+  const hasNextLevel = isLevelUnlocked(nextLevel);
+
+  const handleNextLevel = () => {
+    if (hasNextLevel) {
+      setCurrentLevel(nextLevel);
+      onClose();
+      // Stay in game screen, don't navigate to levels
+    } else {
+      // If no next level available, go to levels screen
+      router.push('/levels');
+      onClose();
+    }
+  };
+
+  const handleHome = () => {
+    router.push('/');
+    onClose();
+  };
+
+  const handleRetry = () => {
+    onClose();
+    // This will trigger a level reset in the parent component
+  };
+
   return (
     <Modal
       visible={visible}
@@ -43,12 +72,12 @@ export default function LevelCompleteModal({
 
           {/* Stars */}
           <View style={levelCompleteModalStyles.starsContainer}>
-            {[1, 2, 3].map((star) => (
+            {Array.from({ length: maxStars }, (_, index) => (
               <Star
-                key={star}
+                key={index}
                 size={40}
-                color={star <= stars ? '#FFE347' : '#64748B'}
-                fill={star <= stars ? '#FFE347' : 'transparent'}
+                color={index < stars ? '#FFE347' : '#64748B'}
+                fill={index < stars ? '#FFE347' : 'transparent'}
               />
             ))}
           </View>
@@ -59,30 +88,44 @@ export default function LevelCompleteModal({
               Performance
             </Text>
             <View style={levelCompleteModalStyles.statRow}>
-              <Text style={levelCompleteModalStyles.statLabel}>Time:</Text>
-              <Text style={levelCompleteModalStyles.statValue}>1:23</Text>
+              <Text style={levelCompleteModalStyles.statLabel}>Stars Earned:</Text>
+              <Text style={levelCompleteModalStyles.statValue}>{stars}/{maxStars}</Text>
             </View>
             <View style={levelCompleteModalStyles.statRow}>
-              <Text style={levelCompleteModalStyles.statLabel}>Moves:</Text>
-              <Text style={levelCompleteModalStyles.statValue}>12</Text>
+              <Text style={levelCompleteModalStyles.statLabel}>Difficulty:</Text>
+              <Text style={levelCompleteModalStyles.statValue}>
+                {level <= 5 ? 'Easy' : level <= 15 ? 'Medium' : 'Hard'}
+              </Text>
             </View>
           </View>
 
           {/* Action Buttons */}
           <View style={levelCompleteModalStyles.buttonContainer}>
-            <TouchableOpacity
-              onPress={onNextLevel}
-              style={[levelCompleteModalStyles.button, levelCompleteModalStyles.nextButton]}
-            >
-              <Text style={levelCompleteModalStyles.nextButtonText}>
-                NEXT LEVEL
-              </Text>
-              <ArrowRight size={24} color="#18FF92" />
-            </TouchableOpacity>
+            {hasNextLevel ? (
+              <TouchableOpacity
+                onPress={handleNextLevel}
+                style={[levelCompleteModalStyles.button, levelCompleteModalStyles.nextButton]}
+              >
+                <Text style={levelCompleteModalStyles.nextButtonText}>
+                  NEXT LEVEL
+                </Text>
+                <ArrowRight size={24} color="#18FF92" />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                onPress={() => router.push('/levels')}
+                style={[levelCompleteModalStyles.button, levelCompleteModalStyles.nextButton]}
+              >
+                <Text style={levelCompleteModalStyles.nextButtonText}>
+                  VIEW LEVELS
+                </Text>
+                <ArrowRight size={24} color="#18FF92" />
+              </TouchableOpacity>
+            )}
 
             <View style={levelCompleteModalStyles.secondaryButtons}>
               <TouchableOpacity
-                onPress={onClose}
+                onPress={handleRetry}
                 style={[levelCompleteModalStyles.button, levelCompleteModalStyles.secondaryButton]}
               >
                 <RotateCcw size={20} color="#64748B" />
@@ -92,7 +135,7 @@ export default function LevelCompleteModal({
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={onClose}
+                onPress={handleHome}
                 style={[levelCompleteModalStyles.button, levelCompleteModalStyles.secondaryButton]}
               >
                 <Home size={20} color="#64748B" />

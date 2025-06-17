@@ -17,6 +17,7 @@ export default function GameScreen() {
     gameState,
     resetLevel: resetGameLevel,
     getCurrentLevelData,
+    getMaxStarsForLevel,
   } = useGameStore();
 
   const { resetLevel: resetRopeLevel, ropes, intersectionCount } = useRopeStore();
@@ -58,9 +59,10 @@ export default function GameScreen() {
 
   const handleHint = () => {
     const ropeCount = ropes.length;
+    const maxStars = getMaxStarsForLevel(currentLevel);
     Alert.alert(
       'How to Play',
-      `Drag the colored dots to move the rope endpoints. Your goal is to untangle all ${ropeCount} ropes so that none of them cross each other. When all ropes are untangled, you win!\n\nTip: Try to identify which ropes are crossing and move their endpoints to separate them.\n\nCurrent intersections: ${intersectionCount}`,
+      `Drag the colored dots to move the rope endpoints. Your goal is to untangle all ${ropeCount} ropes so that none of them cross each other. When all ropes are untangled, you win!\n\nThis level can earn up to ${maxStars} stars based on your performance.\n\nTip: Try to identify which ropes are crossing and move their endpoints to separate them.\n\nCurrent intersections: ${intersectionCount}`,
       [{ text: 'Got it!' }]
     );
   };
@@ -71,7 +73,7 @@ export default function GameScreen() {
 
   const handleNextLevel = () => {
     setShowCompleteModal(false);
-    router.push('/levels');
+    // Modal will handle navigation internally
   };
 
   const formatTime = (seconds: number) => {
@@ -93,6 +95,7 @@ export default function GameScreen() {
   }
 
   const ropeCount = ropes.length || Math.min(currentLevel + 1, 10);
+  const maxStars = getMaxStarsForLevel(currentLevel);
 
   return (
     <View style={gameScreenStyles.container}>
@@ -106,7 +109,7 @@ export default function GameScreen() {
           <View style={gameScreenStyles.headerCenter}>
             <Text style={gameScreenStyles.levelTitle}>LEVEL {currentLevel}</Text>
             <Text style={gameScreenStyles.levelSubtitle}>
-              Untangle {ropeCount} Ropes
+              Untangle {ropeCount} Ropes • Max {maxStars} ⭐
             </Text>
           </View>
 
@@ -157,7 +160,7 @@ export default function GameScreen() {
         visible={showCompleteModal}
         onClose={() => setShowCompleteModal(false)}
         onNextLevel={handleNextLevel}
-        stars={3}
+        stars={getMaxStarsForLevel(currentLevel)} // This will be calculated based on performance
         level={currentLevel}
       />
     </View>

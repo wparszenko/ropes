@@ -7,6 +7,7 @@ export interface PlayerStats {
   totalStars: number;
   levelStars: { [key: number]: number };
   totalPlayTime: number;
+  highestUnlockedLevel: number;
 }
 
 export interface GameSettings {
@@ -39,6 +40,8 @@ interface GameStore extends GameState {
   getCurrentLevelData: () => any;
   saveGameState: () => void;
   loadGameState: () => void;
+  getMaxStarsForLevel: (level: number) => number;
+  isLevelUnlocked: (level: number) => boolean;
 }
 
 const initialState: GameState = {
@@ -49,6 +52,7 @@ const initialState: GameState = {
     totalStars: 0,
     levelStars: {},
     totalPlayTime: 0,
+    highestUnlockedLevel: 1,
   },
   settings: {
     soundEnabled: true,
@@ -65,7 +69,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   ...initialState,
 
   setCurrentLevel: (level: number) => {
-    set({ currentLevel: level, gameState: 'playing', portalActive: false });
+    const { isLevelUnlocked } = get();
+    if (isLevelUnlocked(level)) {
+      set({ currentLevel: level, gameState: 'playing', portalActive: false });
+    }
   },
 
   resetLevel: () => {
@@ -78,23 +85,26 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   completeLevel: (stars: number) => {
-    const { currentLevel, playerStats } = get();
+    const { currentLevel, playerStats, getMaxStarsForLevel } = get();
+    const maxStars = getMaxStarsForLevel(currentLevel);
+    const actualStars = Math.min(stars, maxStars);
+    
     const newLevelStars = { ...playerStats.levelStars };
     const previousStars = newLevelStars[currentLevel] || 0;
     
-    newLevelStars[currentLevel] = Math.max(previousStars, stars);
+    newLevelStars[currentLevel] = Math.max(previousStars, actualStars);
     
     const newStats: PlayerStats = {
       ...playerStats,
       completedLevels: Math.max(playerStats.completedLevels, currentLevel),
       totalStars: Object.values(newLevelStars).reduce((sum, s) => sum + s, 0),
       levelStars: newLevelStars,
+      highestUnlockedLevel: Math.max(playerStats.highestUnlockedLevel, currentLevel + 1),
     };
 
     set({ 
       gameState: 'completed',
       playerStats: newStats,
-      currentLevel: Math.min(currentLevel + 1, 30) // Max 30 levels
     });
     
     get().saveGameState();
@@ -141,6 +151,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
     return getLevelData(currentLevel);
   },
 
+  getMaxStarsForLevel: (level: number) => {
+    // Progressive star system: lower levels have fewer max stars
+    if (level <= 5) return 2;      // Levels 1-5: max 2 stars
+    if (level <= 15) return 3;     // Levels 6-15: max 3 stars
+    return 4;                      // Levels 16+: max 4 stars
+  },
+
+  isLevelUnlocked: (level: number) => {
+    const { playerStats } = get();
+    return level <= playerStats.highestUnlockedLevel;
+  },
+
   saveGameState: async () => {
     try {
       const state = get();
@@ -163,7 +185,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
         set((state) => ({
           ...state,
           currentLevel: parsedState.currentLevel || 1,
-          playerStats: parsedState.playerStats || initialState.playerStats,
+          playerStats: {
+            ...initialState.playerStats,
+            ...parsedState.playerStats,
+            highestUnlockedLevel: parsedState.playerStats?.highestUnlockedLevel || Math.max(1, parsedState.playerStats?.completedLevels + 1 || 1),
+          },
           settings: parsedState.settings || initialState.settings,
         }));
       }

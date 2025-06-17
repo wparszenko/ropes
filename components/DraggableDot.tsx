@@ -89,7 +89,7 @@ export default function DraggableDot({
     })
   ).current;
 
-  // Native gesture handler
+  // Native gesture handler with improved sensitivity
   const panGesture = Gesture.Pan()
     .onStart(() => {
       'worklet';
@@ -130,13 +130,15 @@ export default function DraggableDot({
       if (onPositionChange) {
         runOnJS(onPositionChange)();
       }
-    });
+    })
+    .minDistance(0) // Allow immediate response to touch
+    .shouldCancelWhenOutside(false); // Don't cancel when dragging outside
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
       transform: [
-        { translateX: position.x.value - 15 },
-        { translateY: position.y.value - 15 },
+        { translateX: position.x.value - 20 }, // Increased from 15 to 20 for larger touch area
+        { translateY: position.y.value - 20 },
       ],
     };
   });

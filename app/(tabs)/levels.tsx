@@ -11,7 +11,13 @@ const LEVELS_PER_ROW = 4;
 const LEVEL_SIZE = (width - 60) / LEVELS_PER_ROW;
 
 export default function LevelsScreen() {
-  const { playerStats, currentLevel, setCurrentLevel } = useGameStore();
+  const { 
+    playerStats, 
+    currentLevel, 
+    setCurrentLevel, 
+    getMaxStarsForLevel,
+    isLevelUnlocked 
+  } = useGameStore();
   const totalLevels = 30;
 
   const handleBack = () => {
@@ -19,17 +25,18 @@ export default function LevelsScreen() {
   };
 
   const handleLevelSelect = (level: number) => {
-    if (level <= currentLevel) {
+    if (isLevelUnlocked(level)) {
       setCurrentLevel(level);
       router.push('/game');
     }
   };
 
   const renderLevel = (level: number) => {
-    const isUnlocked = level <= currentLevel;
-    const isCompleted = level < currentLevel;
+    const isUnlocked = isLevelUnlocked(level);
+    const isCompleted = level <= playerStats.completedLevels;
     const isCurrent = level === currentLevel;
     const stars = playerStats.levelStars[level] || 0;
+    const maxStars = getMaxStarsForLevel(level);
 
     return (
       <TouchableOpacity
@@ -71,12 +78,12 @@ export default function LevelsScreen() {
             </Text>
             {isCompleted && stars > 0 && (
               <View style={levelsScreenStyles.starsContainer}>
-                {[1, 2, 3].map((star) => (
+                {Array.from({ length: maxStars }, (_, index) => (
                   <Star
-                    key={star}
-                    size={10}
-                    color={star <= stars ? '#FFE347' : '#64748B'}
-                    fill={star <= stars ? '#FFE347' : 'transparent'}
+                    key={index}
+                    size={8}
+                    color={index < stars ? '#FFE347' : '#64748B'}
+                    fill={index < stars ? '#FFE347' : 'transparent'}
                   />
                 ))}
               </View>
@@ -98,8 +105,8 @@ export default function LevelsScreen() {
       levels.push(renderLevel(i));
     }
 
-    const worldProgress = Math.min(currentLevel - startLevel + 1, endLevel - startLevel + 1);
-    const worldPercentage = Math.max(0, Math.round((worldProgress / (endLevel - startLevel + 1)) * 100));
+    const unlockedLevelsInWorld = Math.max(0, Math.min(playerStats.highestUnlockedLevel - startLevel + 1, endLevel - startLevel + 1));
+    const worldPercentage = Math.round((unlockedLevelsInWorld / (endLevel - startLevel + 1)) * 100);
 
     return (
       <View key={worldNumber} style={levelsScreenStyles.worldContainer}>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Dimensions, StyleSheet, Platform } from 'react-native';
 import { Svg } from 'react-native-svg';
+import { useSharedValue } from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { LevelData } from '@/data/levels';
 import { useGameStore } from '@/store/gameStore';
@@ -24,6 +25,15 @@ interface GameBoardProps {
 interface WirePosition {
   start: { x: number; y: number };
   end: { x: number; y: number };
+}
+
+interface SharedWirePositions {
+  [wireId: string]: {
+    startX: any;
+    startY: any;
+    endX: any;
+    endY: any;
+  };
 }
 
 // Function to check if two line segments intersect
@@ -51,6 +61,7 @@ const doLinesIntersect = (
 export default function GameBoard({ levelData }: GameBoardProps) {
   const { completeLevel } = useGameStore();
   const [hasIntersections, setHasIntersections] = useState(true);
+  const [sharedPositions, setSharedPositions] = useState<SharedWirePositions>({});
   const wirePositionsRef = useRef<Record<string, WirePosition>>({});
 
   const handleWirePositionUpdate = useCallback((wireId: string, start: { x: number; y: number }, end: { x: number; y: number }) => {
@@ -91,23 +102,36 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     }
   }, [levelData, completeLevel]);
 
-  // Initialize wire positions when levelData changes
+  // Initialize shared positions when levelData changes
   useEffect(() => {
     if (levelData) {
+      const newSharedPositions: SharedWirePositions = {};
       const initialPositions: Record<string, WirePosition> = {};
+      
       levelData.wires.forEach((wire) => {
+        // Create shared values for each wire
+        newSharedPositions[wire.id] = {
+          startX: useSharedValue(wire.start[0]),
+          startY: useSharedValue(wire.start[1]),
+          endX: useSharedValue(wire.end[0]),
+          endY: useSharedValue(wire.end[1]),
+        };
+        
+        // Initialize position tracking
         initialPositions[wire.id] = {
           start: { x: wire.start[0], y: wire.start[1] },
           end: { x: wire.end[0], y: wire.end[1] },
         };
       });
+      
+      setSharedPositions(newSharedPositions);
       wirePositionsRef.current = initialPositions;
       setHasIntersections(true); // Reset intersection state
     }
   }, [levelData]);
 
   // Early return after all hooks are called
-  if (!levelData) {
+  if (!levelData || Object.keys(sharedPositions).length === 0) {
     return (
       <GestureHandlerRootView style={styles.container}>
         <View style={styles.gameBoard}>
@@ -128,6 +152,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
               wire={wire}
               onPositionUpdate={handleWirePositionUpdate}
               renderMode="rope"
+              sharedPositions={sharedPositions[wire.id]}
             />
           ))}
         </Svg>
@@ -141,6 +166,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
             wire={wire}
             onPositionUpdate={handleWirePositionUpdate}
             renderMode="dots"
+            sharedPositions={sharedPositions[wire.id]}
           />
         ))}
       </View>

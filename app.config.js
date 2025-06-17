@@ -1,33 +1,20 @@
+
 export default {
   expo: {
     name: "Tangle Escape",
     slug: "tangle-escape",
     version: "1.0.0",
-    sdkVersion: "53.0.00",
+    sdkVersion: "53.0.0",
+    platforms: ["ios", "android"],
     orientation: "portrait",
     icon: "./assets/images/icon.png",
-    scheme: "tangle-escape",
-    userInterfaceStyle: "dark",
-    newArchEnabled: true,
-    ios: {
-      supportsTablet: true
+    splash: {
+      image: "./assets/images/splash.png",
+      resizeMode: "contain",
+      backgroundColor: "#0F1117"
     },
-    web: {
-      bundler: "metro",
-      output: "single",
-      favicon: "./assets/images/favicon.png"
-    },
-    plugins: [
-      "expo-router",
-      "expo-font",
-      "expo-web-browser",
-      "nativewind/babel"
-    ],
-    experiments: {
-      typedRoutes: true
-    },
-    runtimeVersion: {
-      policy: "sdkVersion"
+    updates: {
+      fallbackToCacheTimeout: 0
     }
   }
 };

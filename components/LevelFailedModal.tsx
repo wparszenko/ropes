@@ -20,11 +20,9 @@ export default function LevelFailedModal({
 }: LevelFailedModalProps) {
 
   const handleHome = () => {
+    // Immediately close modal and navigate
     onClose();
-    // Add a small delay to ensure modal state is updated before navigation
-    setTimeout(() => {
-      router.push('/(tabs)');
-    }, 100);
+    router.replace('/(tabs)');
   };
 
   const handleRetry = () => {

@@ -25,7 +25,7 @@ export interface GameState {
   wireConnections: { [key: string]: boolean };
   robotPosition: { x: number; y: number };
   portalActive: boolean;
-  timeRemaining: number; // Add timer state
+  timeRemaining: number;
 }
 
 interface GameStore extends GameState {
@@ -66,7 +66,7 @@ const initialState: GameState = {
   wireConnections: {},
   robotPosition: { x: 100, y: 100 },
   portalActive: false,
-  timeRemaining: 30, // 30 seconds per level
+  timeRemaining: 30,
 };
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -79,7 +79,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         currentLevel: level, 
         gameState: 'playing', 
         portalActive: false,
-        timeRemaining: 30 // Reset timer for new level
+        timeRemaining: 30
       });
     }
   },
@@ -90,7 +90,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       wireConnections: {},
       portalActive: false,
       robotPosition: { x: 100, y: 100 },
-      timeRemaining: 30 // Reset timer on level reset
+      timeRemaining: 30
     });
   },
 
@@ -121,7 +121,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   failLevel: () => {
-    set({ gameState: 'failed' });
+    const { gameState } = get();
+    // Only fail if currently playing
+    if (gameState === 'playing') {
+      set({ gameState: 'failed' });
+    }
   },
 
   updateSettings: (newSettings: Partial<GameSettings>) => {
@@ -240,14 +244,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   decrementTime: () => {
-    const { timeRemaining, gameState } = get();
+    const { timeRemaining, gameState, failLevel } = get();
     if (gameState === 'playing' && timeRemaining > 0) {
       const newTime = timeRemaining - 1;
       set({ timeRemaining: newTime });
       
       // Fail level when time runs out
       if (newTime <= 0) {
-        get().failLevel();
+        failLevel();
       }
     }
   },

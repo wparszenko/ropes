@@ -36,8 +36,8 @@ export default function GameScreen() {
   // Add ref to track if modal has been shown for current level
   const modalShownForLevel = useRef<number | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const levelStartTime = useRef(30);
   const gameStateRef = useRef(gameState);
+  const modalClosingRef = useRef(false);
 
   // Update gameState ref when it changes
   useEffect(() => {
@@ -49,19 +49,20 @@ export default function GameScreen() {
     setLevelData(data);
   }, [currentLevel]);
 
-  // Timer effect
+  // Enhanced timer effect that continues during drag operations
   useEffect(() => {
+    // Clear any existing timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
     if (gameState === 'playing') {
-      // Start timer
+      // Start timer - runs continuously regardless of drag state
       timerRef.current = setInterval(() => {
+        // Use a callback to ensure we get the latest state
         decrementTime();
       }, 1000);
-    } else {
-      // Stop timer
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
     }
 
     return () => {
@@ -77,6 +78,7 @@ export default function GameScreen() {
     if (
       gameState === 'completed' && 
       !showCompleteModal && 
+      !modalClosingRef.current &&
       modalShownForLevel.current !== currentLevel
     ) {
       const timeElapsed = 30 - timeRemaining;
@@ -105,20 +107,26 @@ export default function GameScreen() {
     }
   }, [gameState, showCompleteModal, currentLevel, timeRemaining, completeLevel]);
 
-  // Handle level failure
+  // Handle level failure - only show when actually playing
   useEffect(() => {
-    if (gameState === 'failed' && !showFailedModal) {
+    if (
+      gameState === 'failed' && 
+      !showFailedModal && 
+      !modalClosingRef.current &&
+      modalShownForLevel.current !== currentLevel
+    ) {
       setShowFailedModal(true);
+      modalShownForLevel.current = currentLevel;
     }
-  }, [gameState, showFailedModal]);
+  }, [gameState, showFailedModal, currentLevel]);
 
   // Reset modal tracking when level changes
   useEffect(() => {
     modalShownForLevel.current = null;
     setShowCompleteModal(false);
     setShowFailedModal(false);
+    modalClosingRef.current = false;
     setTimeRemaining(30); // Reset timer for new level
-    levelStartTime.current = 30;
   }, [currentLevel, setTimeRemaining]);
 
   const handleBack = () => {
@@ -126,11 +134,17 @@ export default function GameScreen() {
   };
 
   const handleReset = () => {
-    resetGameLevel();
-    resetRopeLevel();
+    modalClosingRef.current = true;
     setShowCompleteModal(false);
     setShowFailedModal(false);
     modalShownForLevel.current = null;
+    
+    resetGameLevel();
+    resetRopeLevel();
+    
+    setTimeout(() => {
+      modalClosingRef.current = false;
+    }, 200);
   };
 
   const handleHint = () => {
@@ -147,25 +161,28 @@ export default function GameScreen() {
   };
 
   const handleNextLevel = () => {
+    modalClosingRef.current = true;
     setShowCompleteModal(false);
     modalShownForLevel.current = null;
+    
+    setTimeout(() => {
+      modalClosingRef.current = false;
+    }, 200);
   };
 
   const handleCloseModal = () => {
-    // Ensure both modals are closed and state is reset
+    // Set closing flag to prevent re-opening
+    modalClosingRef.current = true;
+    
+    // Close both modals immediately
     setShowCompleteModal(false);
     setShowFailedModal(false);
     modalShownForLevel.current = null;
     
-    // Force a small delay to prevent re-triggering
+    // Reset the closing flag after a delay
     setTimeout(() => {
-      // Additional safety check
-      if (gameStateRef.current === 'completed' || gameStateRef.current === 'failed') {
-        // Reset game state to playing to prevent modal from showing again
-        resetGameLevel();
-        resetRopeLevel();
-      }
-    }, 100);
+      modalClosingRef.current = false;
+    }, 500);
   };
 
   const formatTime = (seconds: number) => {

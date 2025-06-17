@@ -60,6 +60,7 @@ export default function DraggableDot({
       onMoveShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponderCapture: () => true,
       onPanResponderGrant: (evt) => {
+        'worklet';
         startX.value = position.x.value;
         startY.value = position.y.value;
         lastValidX.value = position.x.value;
@@ -69,6 +70,7 @@ export default function DraggableDot({
         setDragging(true);
       },
       onPanResponderMove: (evt, gestureState) => {
+        'worklet';
         const newX = clamp(
           startX.value + gestureState.dx,
           bounds.minX,
@@ -91,6 +93,7 @@ export default function DraggableDot({
         }
       },
       onPanResponderRelease: () => {
+        'worklet';
         isDragging.value = false;
         isPressed.value = false;
         
@@ -119,6 +122,7 @@ export default function DraggableDot({
         }
       },
       onPanResponderTerminate: () => {
+        'worklet';
         // Handle gesture termination - restore to last valid position
         isDragging.value = false;
         isPressed.value = false;
@@ -235,6 +239,7 @@ export default function DraggableDot({
     .runOnJS(false); // Run on UI thread for better performance
 
   const animatedStyle = useAnimatedStyle(() => {
+    'worklet';
     // Enhanced visual feedback with better scaling and positioning
     const scale = withTiming(
       isPressed.value ? 1.3 : isDragging.value ? 1.2 : 1.0,
@@ -246,7 +251,7 @@ export default function DraggableDot({
       { duration: 100 }
     );
     
-    // Ensure valid position values
+    // Ensure valid position values - use worklet-safe access
     const x = isNaN(position.x.value) ? lastValidX.value : position.x.value;
     const y = isNaN(position.y.value) ? lastValidY.value : position.y.value;
     

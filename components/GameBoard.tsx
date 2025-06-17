@@ -124,12 +124,13 @@ export default function GameBoard({ levelData }: GameBoardProps) {
           const position = ropePositions[rope.id];
           const shared = sharedValues[index];
           if (position && shared && index < MAX_ROPES) {
-            // Validate position values before setting
+            // Validate position values before setting - avoid reading during render
             const startX = isNaN(position.startX) ? GAME_BOUNDS.minX + 50 : position.startX;
             const startY = isNaN(position.startY) ? GAME_BOUNDS.minY + 50 : position.startY;
             const endX = isNaN(position.endX) ? GAME_BOUNDS.maxX - 50 : position.endX;
             const endY = isNaN(position.endY) ? GAME_BOUNDS.maxY - 50 : position.endY;
             
+            // Set values outside of render cycle
             shared.startX.value = startX;
             shared.startY.value = startY;
             shared.endX.value = endX;
@@ -193,15 +194,21 @@ export default function GameBoard({ levelData }: GameBoardProps) {
 
   // Enhanced position change handler with validation
   const handlePositionChange = useCallback((ropeId: string, endpoint: 'start' | 'end', sharedX: any, sharedY: any) => {
-    // Validate shared values before using them
-    const x = isNaN(sharedX.value) ? GAME_BOUNDS.minX + 50 : sharedX.value;
-    const y = isNaN(sharedY.value) ? GAME_BOUNDS.minY + 50 : sharedY.value;
+    // Use a callback to avoid reading shared values during render
+    const updatePosition = () => {
+      // Validate shared values before using them
+      const x = isNaN(sharedX.value) ? GAME_BOUNDS.minX + 50 : sharedX.value;
+      const y = isNaN(sharedY.value) ? GAME_BOUNDS.minY + 50 : sharedY.value;
+      
+      const positionUpdate = endpoint === 'start' 
+        ? { startX: x, startY: y }
+        : { endX: x, endY: y };
+      
+      updateRopePosition(ropeId, positionUpdate);
+    };
     
-    const positionUpdate = endpoint === 'start' 
-      ? { startX: x, startY: y }
-      : { endX: x, endY: y };
-    
-    updateRopePosition(ropeId, positionUpdate);
+    // Defer the update to avoid reading during render
+    setTimeout(updatePosition, 0);
   }, [updateRopePosition]);
 
   // Show loading state while initializing

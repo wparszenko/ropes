@@ -23,6 +23,7 @@ interface RopePathProps {
 export default function RopePath({ startPoint, endPoint, color }: RopePathProps) {
   // Use useDerivedValue to create a stable derived value for the path
   const pathData = useDerivedValue(() => {
+    'worklet';
     // Ensure we have valid numbers with fallbacks
     const startX = typeof startPoint.x.value === 'number' && !isNaN(startPoint.x.value) ? startPoint.x.value : 50;
     const startY = typeof startPoint.y.value === 'number' && !isNaN(startPoint.y.value) ? startPoint.y.value : 50;
@@ -48,6 +49,7 @@ export default function RopePath({ startPoint, endPoint, color }: RopePathProps)
   }, [startPoint.x, startPoint.y, endPoint.x, endPoint.y]);
 
   const animatedProps = useAnimatedProps(() => {
+    'worklet';
     return {
       d: pathData.value,
     };

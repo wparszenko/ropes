@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Dimensions, Alert, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, Dimensions, Alert, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, RotateCcw, Lightbulb, Chrome as Home, Play, Pause, Zap } from 'lucide-react-native';
+import { ArrowLeft, RotateCcw, Lightbulb, Chrome as Home } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useGameStore } from '@/store/gameStore';
 import GameBoard from '@/components/GameBoard';
 import LevelCompleteModal from '@/components/LevelCompleteModal';
-import FailureModal from '@/components/FailureModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -15,16 +14,12 @@ export default function GameScreen() {
     currentLevel,
     gameState,
     resetLevel,
-    completeLevel,
-    failLevel,
     getCurrentLevelData,
   } = useGameStore();
 
   const [showCompleteModal, setShowCompleteModal] = useState(false);
-  const [showFailureModal, setShowFailureModal] = useState(false);
   const [levelData, setLevelData] = useState(null);
   const [gameTime, setGameTime] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
   const [moves, setMoves] = useState(0);
 
   useEffect(() => {
@@ -35,20 +30,18 @@ export default function GameScreen() {
   useEffect(() => {
     if (gameState === 'completed') {
       setShowCompleteModal(true);
-    } else if (gameState === 'failed') {
-      setShowFailureModal(true);
     }
   }, [gameState]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (!isPaused && gameState === 'playing') {
+    if (gameState === 'playing') {
       interval = setInterval(() => {
         setGameTime(prev => prev + 1);
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [isPaused, gameState]);
+  }, [gameState]);
 
   const handleBack = () => {
     router.back();
@@ -62,8 +55,8 @@ export default function GameScreen() {
 
   const handleHint = () => {
     Alert.alert(
-      'Hint',
-      'Drag the colored dots to untangle the ropes! Move them so that no ropes cross each other. When all ropes are untangled, the portal will activate and the robot can escape!',
+      'How to Play',
+      'Drag the colored dots to move the rope endpoints. Your goal is to untangle all ropes so that none of them cross each other. When all ropes are untangled, you win!',
       [{ text: 'Got it!' }]
     );
   };
@@ -72,18 +65,10 @@ export default function GameScreen() {
     router.push('/');
   };
 
-  const togglePause = () => {
-    setIsPaused(!isPaused);
-  };
-
   const handleNextLevel = () => {
     setShowCompleteModal(false);
-    // Logic to advance to next level would go here
-  };
-
-  const handleRetry = () => {
-    setShowFailureModal(false);
-    resetLevel();
+    // Move to next level
+    router.push('/levels');
   };
 
   const formatTime = (seconds: number) => {
@@ -97,7 +82,6 @@ export default function GameScreen() {
       <View style={styles.container}>
         <LinearGradient colors={['#0F1117', '#1A1D29']} style={styles.gradient}>
           <View style={styles.loadingContainer}>
-            <Zap size={48} color="#18FF92" />
             <Text style={styles.loadingText}>Loading Level {currentLevel}...</Text>
           </View>
         </LinearGradient>
@@ -157,11 +141,6 @@ export default function GameScreen() {
             <Text style={styles.controlButtonText}>Reset</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={togglePause} style={[styles.controlButton, styles.pauseButton]}>
-            {isPaused ? <Play size={24} color="#18FF92" /> : <Pause size={24} color="#18FF92" />}
-            <Text style={styles.controlButtonText}>{isPaused ? 'Resume' : 'Pause'}</Text>
-          </TouchableOpacity>
-
           <TouchableOpacity onPress={handleHint} style={[styles.controlButton, styles.hintButton]}>
             <Lightbulb size={24} color="#FFE347" />
             <Text style={styles.controlButtonText}>Hint</Text>
@@ -169,20 +148,13 @@ export default function GameScreen() {
         </View>
       </LinearGradient>
 
-      {/* Modals */}
+      {/* Level Complete Modal */}
       <LevelCompleteModal
         visible={showCompleteModal}
         onClose={() => setShowCompleteModal(false)}
         onNextLevel={handleNextLevel}
-        stars={3} // This would be calculated based on performance
+        stars={3}
         level={currentLevel}
-      />
-
-      <FailureModal
-        visible={showFailureModal}
-        onClose={() => setShowFailureModal(false)}
-        onRetry={handleRetry}
-        onHome={handleHome}
       />
     </View>
   );
@@ -268,16 +240,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderRadius: 12,
-    minWidth: 80,
+    minWidth: 100,
     borderWidth: 2,
   },
   resetButton: {
     backgroundColor: 'rgba(255, 80, 80, 0.1)',
     borderColor: '#FF5050',
-  },
-  pauseButton: {
-    backgroundColor: 'rgba(24, 255, 146, 0.1)',
-    borderColor: '#18FF92',
   },
   hintButton: {
     backgroundColor: 'rgba(255, 227, 71, 0.1)',

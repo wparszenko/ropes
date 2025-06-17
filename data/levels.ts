@@ -3,42 +3,19 @@ export interface Wire {
   start: [number, number];
   end: [number, number];
   color: string;
-  connected: boolean;
-}
-
-export interface Socket {
-  id: string;
-  position: [number, number];
-  color: string;
-  connected: boolean;
-}
-
-export interface Obstacle {
-  id: string;
-  type: 'static' | 'rotating' | 'moving';
-  position: [number, number];
-  size: [number, number];
-  rotation?: number;
-  speed?: number;
 }
 
 export interface LevelData {
   levelId: number;
   wires: Wire[];
-  sockets: Socket[];
-  obstacles: Obstacle[];
-  robotStart: [number, number];
-  portalPosition: [number, number];
   goals: {
     connectAll: boolean;
-    timeLimit?: number;
-    maxMoves?: number;
   };
   difficulty: 'easy' | 'medium' | 'hard';
 }
 
 export const levelData: LevelData[] = [
-  // Level 1 - Simple crossing
+  // Level 1 - Simple crossing (2 ropes)
   {
     levelId: 1,
     wires: [
@@ -47,27 +24,21 @@ export const levelData: LevelData[] = [
         start: [80, 150],
         end: [280, 250],
         color: '#E74C3C',
-        connected: false,
       },
       {
         id: 'rope2',
         start: [80, 250],
         end: [280, 150],
         color: '#3498DB',
-        connected: false,
       },
     ],
-    sockets: [],
-    obstacles: [],
-    robotStart: [50, 200],
-    portalPosition: [320, 200],
     goals: {
       connectAll: true,
     },
     difficulty: 'easy',
   },
 
-  // Level 2 - Three ropes
+  // Level 2 - Three ropes triangle
   {
     levelId: 2,
     wires: [
@@ -76,34 +47,27 @@ export const levelData: LevelData[] = [
         start: [60, 120],
         end: [300, 280],
         color: '#E74C3C',
-        connected: false,
       },
       {
         id: 'rope2',
         start: [180, 100],
         end: [100, 300],
         color: '#3498DB',
-        connected: false,
       },
       {
         id: 'rope3',
         start: [300, 120],
         end: [60, 280],
         color: '#2ECC71',
-        connected: false,
       },
     ],
-    sockets: [],
-    obstacles: [],
-    robotStart: [180, 200],
-    portalPosition: [180, 200],
     goals: {
       connectAll: true,
     },
     difficulty: 'easy',
   },
 
-  // Level 3 - Four ropes in a knot
+  // Level 3 - Four ropes crossing
   {
     levelId: 3,
     wires: [
@@ -112,41 +76,33 @@ export const levelData: LevelData[] = [
         start: [80, 120],
         end: [280, 120],
         color: '#E74C3C',
-        connected: false,
       },
       {
         id: 'rope2',
         start: [280, 160],
         end: [80, 160],
         color: '#3498DB',
-        connected: false,
       },
       {
         id: 'rope3',
         start: [80, 200],
         end: [280, 200],
         color: '#2ECC71',
-        connected: false,
       },
       {
         id: 'rope4',
         start: [280, 240],
         end: [80, 240],
         color: '#F39C12',
-        connected: false,
       },
     ],
-    sockets: [],
-    obstacles: [],
-    robotStart: [50, 180],
-    portalPosition: [320, 180],
     goals: {
       connectAll: true,
     },
     difficulty: 'medium',
   },
 
-  // Level 4 - Star pattern
+  // Level 4 - Star pattern (5 ropes)
   {
     levelId: 4,
     wires: [
@@ -155,48 +111,39 @@ export const levelData: LevelData[] = [
         start: [180, 100],
         end: [120, 250],
         color: '#E74C3C',
-        connected: false,
       },
       {
         id: 'rope2',
         start: [240, 250],
         end: [80, 180],
         color: '#3498DB',
-        connected: false,
       },
       {
         id: 'rope3',
         start: [280, 180],
         end: [180, 100],
         color: '#2ECC71',
-        connected: false,
       },
       {
         id: 'rope4',
         start: [240, 250],
         end: [280, 180],
         color: '#F39C12',
-        connected: false,
       },
       {
         id: 'rope5',
         start: [120, 250],
         end: [80, 180],
         color: '#9B59B6',
-        connected: false,
       },
     ],
-    sockets: [],
-    obstacles: [],
-    robotStart: [180, 175],
-    portalPosition: [180, 175],
     goals: {
       connectAll: true,
     },
     difficulty: 'medium',
   },
 
-  // Level 5 - Complex web
+  // Level 5 - Complex web (6 ropes)
   {
     levelId: 5,
     wires: [
@@ -205,48 +152,38 @@ export const levelData: LevelData[] = [
         start: [60, 100],
         end: [300, 300],
         color: '#E74C3C',
-        connected: false,
       },
       {
         id: 'rope2',
         start: [300, 100],
         end: [60, 300],
         color: '#3498DB',
-        connected: false,
       },
       {
         id: 'rope3',
         start: [60, 200],
         end: [300, 200],
         color: '#2ECC71',
-        connected: false,
       },
       {
         id: 'rope4',
         start: [180, 100],
         end: [180, 300],
         color: '#F39C12',
-        connected: false,
       },
       {
         id: 'rope5',
         start: [120, 150],
         end: [240, 250],
         color: '#9B59B6',
-        connected: false,
       },
       {
         id: 'rope6',
         start: [240, 150],
         end: [120, 250],
         color: '#E67E22',
-        connected: false,
       },
     ],
-    sockets: [],
-    obstacles: [],
-    robotStart: [30, 200],
-    portalPosition: [330, 200],
     goals: {
       connectAll: true,
     },
@@ -279,20 +216,14 @@ export const generateLevel = (difficulty: 'easy' | 'medium' | 'hard', levelId: n
       start: [Math.max(60, Math.min(300, startX)), Math.max(100, Math.min(300, startY))],
       end: [Math.max(60, Math.min(300, endX)), Math.max(100, Math.min(300, endY))],
       color: colors[i % colors.length],
-      connected: false,
     });
   }
 
   return {
     levelId,
     wires,
-    sockets: [],
-    obstacles: [],
-    robotStart: [30, 200],
-    portalPosition: [330, 200],
     goals: {
       connectAll: true,
-      timeLimit: difficulty === 'hard' ? 120 : undefined,
     },
     difficulty,
   };

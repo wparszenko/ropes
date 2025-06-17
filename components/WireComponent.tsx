@@ -11,9 +11,10 @@ interface WireComponentProps {
     color: string;
   };
   onPositionUpdate: (wireId: string, start: { x: number; y: number }, end: { x: number; y: number }) => void;
+  renderMode: 'rope' | 'dots';
 }
 
-export default function WireComponent({ wire, onPositionUpdate }: WireComponentProps) {
+export default function WireComponent({ wire, onPositionUpdate, renderMode }: WireComponentProps) {
   const startX = useSharedValue(wire.start[0]);
   const startY = useSharedValue(wire.start[1]);
   const endX = useSharedValue(wire.end[0]);
@@ -27,13 +28,18 @@ export default function WireComponent({ wire, onPositionUpdate }: WireComponentP
     );
   }, [wire.id, startX, startY, endX, endY, onPositionUpdate]);
 
-  return (
-    <>
+  if (renderMode === 'rope') {
+    return (
       <RopePath
         startPoint={{ x: startX, y: startY }}
         endPoint={{ x: endX, y: endY }}
         color={wire.color}
       />
+    );
+  }
+
+  return (
+    <>
       <DraggableDot 
         position={{ x: startX, y: startY }}
         color={wire.color}

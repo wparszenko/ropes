@@ -49,21 +49,21 @@ const doLinesIntersect = (
 };
 
 export default function GameBoard({ levelData }: GameBoardProps) {
-  const { completeLevel, activatePortal } = useGameStore();
+  const { completeLevel } = useGameStore();
   const [hasIntersections, setHasIntersections] = useState(true);
   const wirePositionsRef = useRef<Record<string, WirePosition>>({});
 
   const handleWirePositionUpdate = useCallback((wireId: string, start: { x: number; y: number }, end: { x: number; y: number }) => {
     wirePositionsRef.current[wireId] = { start, end };
-    checkIntersections();
+    checkVictory();
   }, []);
 
-  // Check for rope intersections
-  const checkIntersections = useCallback(() => {
+  // Check for victory condition (no intersections)
+  const checkVictory = useCallback(() => {
     if (!levelData) return;
 
     const wirePositions = Object.values(wirePositionsRef.current);
-    if (wirePositions.length === 0) return;
+    if (wirePositions.length < 2) return;
 
     let foundIntersection = false;
 
@@ -83,14 +83,13 @@ export default function GameBoard({ levelData }: GameBoardProps) {
 
     setHasIntersections(foundIntersection);
 
-    // Complete level when no intersections
-    if (!foundIntersection && levelData.goals.connectAll) {
-      activatePortal();
+    // Victory when no intersections
+    if (!foundIntersection) {
       setTimeout(() => {
         completeLevel(3);
-      }, 1000);
+      }, 500);
     }
-  }, [levelData, activatePortal, completeLevel]);
+  }, [levelData, completeLevel]);
 
   // Initialize wire positions when levelData changes
   useEffect(() => {
@@ -103,6 +102,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
         };
       });
       wirePositionsRef.current = initialPositions;
+      setHasIntersections(true); // Reset intersection state
     }
   }, [levelData]);
 
@@ -119,58 +119,40 @@ export default function GameBoard({ levelData }: GameBoardProps) {
 
   const containerContent = (
     <View style={styles.gameBoard}>
-      {/* SVG Layer - Behind dots */}
+      {/* SVG Layer for ropes */}
       <View style={styles.svgContainer}>
         <Svg width={width - 32} height={BOARD_HEIGHT} style={styles.svg}>
-          {/* Render wires */}
           {levelData.wires.map((wire) => (
             <WireComponent
-              key={wire.id}
+              key={`rope-${wire.id}`}
               wire={wire}
               onPositionUpdate={handleWirePositionUpdate}
+              renderMode="rope"
             />
           ))}
         </Svg>
       </View>
 
-      {/* Dots Layer - Above SVG */}
+      {/* Dots Layer for draggable endpoints */}
       <View style={styles.dotsContainer}>
         {levelData.wires.map((wire) => (
           <WireComponent
             key={`dots-${wire.id}`}
             wire={wire}
             onPositionUpdate={handleWirePositionUpdate}
+            renderMode="dots"
           />
         ))}
       </View>
 
-      {/* Success Portal */}
+      {/* Victory indicator */}
       {!hasIntersections && (
-        <View style={styles.portalContainer}>
-          <View style={[styles.portal, styles.portalOuter]} />
-          <View style={[styles.portal, styles.portalInner]} />
-          <View style={[styles.portal, styles.portalCore]} />
+        <View style={styles.victoryContainer}>
+          <View style={styles.victoryCircle}>
+            <View style={styles.victoryInner} />
+          </View>
         </View>
       )}
-
-      {/* Robot */}
-      <View
-        style={[
-          styles.robot,
-          {
-            left: levelData.robotStart[0] - 15,
-            top: levelData.robotStart[1] - 15,
-          },
-        ]}
-      >
-        <View style={styles.robotBody}>
-          <View style={styles.robotEyes}>
-            <View style={styles.robotEye} />
-            <View style={styles.robotEye} />
-          </View>
-          <View style={styles.robotMouth} />
-        </View>
-      </View>
     </View>
   );
 
@@ -228,70 +210,27 @@ const styles = StyleSheet.create({
     zIndex: 2,
     pointerEvents: 'box-none',
   },
-  portalContainer: {
+  victoryContainer: {
     position: 'absolute',
     top: '50%',
     left: '50%',
-    transform: [{ translateX: -40 }, { translateY: -40 }],
-    zIndex: 1,
+    transform: [{ translateX: -30 }, { translateY: -30 }],
+    zIndex: 3,
   },
-  portal: {
-    position: 'absolute',
-    borderRadius: 50,
-  },
-  portalOuter: {
-    width: 80,
-    height: 80,
-    backgroundColor: 'rgba(24, 255, 146, 0.2)',
+  victoryCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(24, 255, 146, 0.3)',
     borderWidth: 3,
     borderColor: '#18FF92',
-  },
-  portalInner: {
-    width: 50,
-    height: 50,
-    backgroundColor: 'rgba(24, 255, 146, 0.4)',
-    borderWidth: 2,
-    borderColor: '#18FF92',
-    top: 15,
-    left: 15,
-  },
-  portalCore: {
-    width: 20,
-    height: 20,
-    backgroundColor: '#18FF92',
-    top: 30,
-    left: 30,
-  },
-  robot: {
-    position: 'absolute',
-    width: 30,
-    height: 30,
-    zIndex: 5,
-  },
-  robotBody: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 224, 255, 0.8)',
-    borderRadius: 15,
-    borderWidth: 2,
-    borderColor: '#00E0FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  robotEyes: {
-    flexDirection: 'row',
-    marginBottom: 2,
-  },
-  robotEye: {
-    width: 4,
-    height: 4,
+  victoryInner: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: '#18FF92',
-    borderRadius: 2,
-    marginHorizontal: 1,
-  },
-  robotMouth: {
-    width: 6,
-    height: 2,
-    backgroundColor: 'rgba(24, 255, 146, 0.6)',
-    borderRadius: 1,
   },
 });

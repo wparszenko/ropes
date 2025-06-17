@@ -10,6 +10,7 @@ import {
   Gesture,
   GestureDetector,
 } from 'react-native-gesture-handler';
+import { useRopeStore } from '@/store/ropeStore';
 import { draggableDotStyles } from '@/styles/draggableDotStyles';
 
 interface DraggableDotProps {
@@ -40,6 +41,8 @@ export default function DraggableDot({
   bounds = { minX: 40, maxX: 320, minY: 40, maxY: 600 }
 }: DraggableDotProps) {
   
+  const { setDragging } = useRopeStore();
+  
   // Store the starting position when gesture begins
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
@@ -52,6 +55,7 @@ export default function DraggableDot({
       onPanResponderGrant: () => {
         startX.value = position.x.value;
         startY.value = position.y.value;
+        setDragging(true); // Set dragging state
       },
       onPanResponderMove: (evt, gestureState) => {
         const newX = clamp(
@@ -82,6 +86,8 @@ export default function DraggableDot({
           stiffness: 150,
         });
         
+        setDragging(false); // End dragging state
+        
         if (onPositionChange) {
           onPositionChange();
         }
@@ -95,6 +101,7 @@ export default function DraggableDot({
       'worklet';
       startX.value = position.x.value;
       startY.value = position.y.value;
+      runOnJS(setDragging)(true); // Set dragging state
     })
     .onUpdate((event) => {
       'worklet';
@@ -126,6 +133,8 @@ export default function DraggableDot({
         damping: 15,
         stiffness: 150,
       });
+      
+      runOnJS(setDragging)(false); // End dragging state
       
       if (onPositionChange) {
         runOnJS(onPositionChange)();

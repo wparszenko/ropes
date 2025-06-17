@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, Dimensions, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, RotateCcw, Lightbulb, Chrome as Home } from 'lucide-react-native';
@@ -26,6 +26,9 @@ export default function GameScreen() {
   const [levelData, setLevelData] = useState(null);
   const [gameTime, setGameTime] = useState(0);
   const [modalStars, setModalStars] = useState(0);
+  
+  // Add ref to track if modal has been shown for current level
+  const modalShownForLevel = useRef<number | null>(null);
 
   useEffect(() => {
     const data = getCurrentLevelData();
@@ -33,7 +36,12 @@ export default function GameScreen() {
   }, [currentLevel]);
 
   useEffect(() => {
-    if (gameState === 'completed' && !showCompleteModal) {
+    // Only show modal if it hasn't been shown for this level yet
+    if (
+      gameState === 'completed' && 
+      !showCompleteModal && 
+      modalShownForLevel.current !== currentLevel
+    ) {
       // Calculate stars based on performance
       const maxStars = getMaxStarsForLevel(currentLevel);
       const baseStars = 1;
@@ -49,8 +57,15 @@ export default function GameScreen() {
       const totalStars = Math.min(baseStars + performanceStars, maxStars);
       setModalStars(totalStars);
       setShowCompleteModal(true);
+      modalShownForLevel.current = currentLevel; // Mark modal as shown for this level
     }
   }, [gameState, showCompleteModal, currentLevel, getMaxStarsForLevel, intersectionCount, gameTime]);
+
+  // Reset modal tracking when level changes
+  useEffect(() => {
+    modalShownForLevel.current = null;
+    setShowCompleteModal(false);
+  }, [currentLevel]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -71,6 +86,7 @@ export default function GameScreen() {
     resetRopeLevel();
     setGameTime(0);
     setShowCompleteModal(false); // Ensure modal is closed on reset
+    modalShownForLevel.current = null; // Reset modal tracking
   };
 
   const handleHint = () => {
@@ -89,11 +105,13 @@ export default function GameScreen() {
 
   const handleNextLevel = () => {
     setShowCompleteModal(false);
+    modalShownForLevel.current = null; // Reset modal tracking
     // Modal will handle navigation internally
   };
 
   const handleCloseModal = () => {
     setShowCompleteModal(false);
+    modalShownForLevel.current = null; // Reset modal tracking
   };
 
   const formatTime = (seconds: number) => {

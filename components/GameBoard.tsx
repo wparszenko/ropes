@@ -42,6 +42,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     ropePositions, 
     intersectionCount, 
     isCompleted,
+    isDragging,
     initializeLevel,
     updateRopePosition,
     checkIntersections 
@@ -49,6 +50,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
 
   // Add ref to track if level completion has been triggered
   const completionTriggeredRef = useRef(false);
+  const levelRef = useRef(currentLevel);
 
   // Create a fixed number of shared values at the top level
   // This ensures the number of hook calls remains constant
@@ -64,9 +66,11 @@ export default function GameBoard({ levelData }: GameBoardProps) {
 
   // Initialize level when component mounts or level changes
   useEffect(() => {
-    initializeLevel(currentLevel, GAME_BOUNDS);
-    // Reset completion trigger when level changes
-    completionTriggeredRef.current = false;
+    if (currentLevel !== levelRef.current) {
+      initializeLevel(currentLevel, GAME_BOUNDS);
+      completionTriggeredRef.current = false;
+      levelRef.current = currentLevel;
+    }
   }, [currentLevel, initializeLevel]);
 
   // Update shared values when positions change
@@ -83,9 +87,15 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     });
   }, [ropePositions, ropes]);
 
-  // Check for level completion with proper debouncing
+  // Check for level completion with proper debouncing - only when not dragging
   useEffect(() => {
-    if (isCompleted && ropes.length > 0 && !completionTriggeredRef.current && gameState === 'playing') {
+    if (
+      isCompleted && 
+      ropes.length > 0 && 
+      !completionTriggeredRef.current && 
+      gameState === 'playing' &&
+      !isDragging // Only complete when not dragging
+    ) {
       completionTriggeredRef.current = true;
       
       setTimeout(() => {
@@ -96,9 +106,9 @@ export default function GameBoard({ levelData }: GameBoardProps) {
         
         const totalStars = Math.min(baseStars + timeBonus + efficiencyBonus, 4); // Max 4 stars
         completeLevel(totalStars);
-      }, 500);
+      }, 300); // Reduced delay for better responsiveness
     }
-  }, [isCompleted, ropes.length, currentLevel, completeLevel, intersectionCount, gameState]);
+  }, [isCompleted, ropes.length, currentLevel, completeLevel, intersectionCount, gameState, isDragging]);
 
   // Reset completion trigger when game state changes back to playing
   useEffect(() => {

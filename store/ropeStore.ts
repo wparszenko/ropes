@@ -14,6 +14,7 @@ export interface RopeState {
   intersectionCount: number;
   isCompleted: boolean;
   bounds: GameBounds | null;
+  isDragging: boolean; // Add dragging state
 }
 
 interface RopeStore extends RopeState {
@@ -22,6 +23,7 @@ interface RopeStore extends RopeState {
   checkIntersections: () => number;
   resetLevel: () => void;
   getCurrentRopes: () => Rope[];
+  setDragging: (dragging: boolean) => void; // Add dragging control
 }
 
 const initialState: RopeState = {
@@ -30,6 +32,7 @@ const initialState: RopeState = {
   intersectionCount: 0,
   isCompleted: false,
   bounds: null,
+  isDragging: false,
 };
 
 export const useRopeStore = create<RopeStore>((set, get) => ({
@@ -58,6 +61,7 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
       intersectionCount: initialIntersections,
       isCompleted: false,
       bounds,
+      isDragging: false,
     });
   },
 
@@ -77,15 +81,17 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
 
     set({ ropePositions: newPositions });
     
-    // Check intersections after position update
-    get().checkIntersections();
+    // Only check intersections if not currently dragging
+    if (!state.isDragging) {
+      get().checkIntersections();
+    }
   },
 
   checkIntersections: () => {
     const state = get();
     const currentRopes = get().getCurrentRopes();
     const newIntersectionCount = countIntersections(currentRopes);
-    const isCompleted = newIntersectionCount === 0 && currentRopes.length > 0;
+    const isCompleted = newIntersectionCount === 0 && currentRopes.length > 0 && !state.isDragging;
 
     set({
       intersectionCount: newIntersectionCount,
@@ -108,6 +114,17 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
         y: ropePositions[rope.id]?.endY || rope.end.y,
       },
     }));
+  },
+
+  setDragging: (dragging: boolean) => {
+    set({ isDragging: dragging });
+    
+    // Check intersections when dragging ends
+    if (!dragging) {
+      setTimeout(() => {
+        get().checkIntersections();
+      }, 100); // Small delay to ensure position updates are complete
+    }
   },
 
   resetLevel: () => {

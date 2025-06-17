@@ -13,9 +13,10 @@ const BOARD_MARGIN = 16;
 const BOARD_PADDING = 20;
 const DOT_RADIUS = 15;
 
-// Game board dimensions
+// Make the game board much taller and more responsive
 const BOARD_WIDTH = width - (BOARD_MARGIN * 2);
-const BOARD_HEIGHT = Math.min(height - 300, 400);
+// Use more of the available screen height - accounting for header (~140px) and bottom controls (~120px)
+const BOARD_HEIGHT = Math.max(height - 280, 500); // Minimum 500px height, but use available space
 
 // Game boundaries - properly constrained within the visible game board
 const GAME_BOUNDS = {
@@ -30,10 +31,10 @@ interface GameBoardProps {
 }
 
 export default function GameBoard({ levelData }: GameBoardProps) {
-  // Calculate initial positions within bounds
+  // Calculate initial positions within bounds - use more of the available space
   const centerX = BOARD_WIDTH / 2;
   const centerY = BOARD_HEIGHT / 2;
-  const offset = 60;
+  const offset = Math.min(BOARD_WIDTH, BOARD_HEIGHT) * 0.25; // Scale offset based on board size
 
   // Cable 1 (Red) - crossing diagonally
   const cable1Start = {
@@ -140,6 +141,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
+    minHeight: 400, // Ensure minimum height
   },
   container: {
     backgroundColor: 'rgba(15, 17, 23, 0.5)',
@@ -150,6 +152,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(24, 255, 146, 0.3)',
     overflow: 'hidden',
     position: 'relative',
+    flex: 1, // Allow it to grow
     // Add subtle shadow for depth
     shadowColor: '#18FF92',
     shadowOffset: { width: 0, height: 0 },

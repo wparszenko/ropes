@@ -107,6 +107,15 @@ function getRandomAngle(baseAngle?: number, variance = Math.PI): number {
   return Math.random() * 2 * Math.PI;
 }
 
+// Simple seeded random number generator
+function createSeededRandom(seed: number) {
+  let currentSeed = seed;
+  return () => {
+    currentSeed = (currentSeed * 9301 + 49297) % 233280;
+    return currentSeed / 233280;
+  };
+}
+
 // Generate ropes that are guaranteed to intersect with randomization and 40% longer length
 export function generateCrossedRopes(ropeCount: number, bounds: GameBounds): Rope[] {
   const ropes: Rope[] = [];
@@ -125,15 +134,9 @@ export function generateCrossedRopes(ropeCount: number, bounds: GameBounds): Rop
   // Increased radius for 40% longer ropes
   const maxRadius = Math.min(playAreaWidth, playAreaHeight) * 0.63; // Increased from 0.45 (40% increase)
 
-  // Add randomization seed based on current time and rope count
+  // Create seeded random function for consistent randomization
   const randomSeed = Date.now() + ropeCount * 1000;
-  Math.random = (() => {
-    let seed = randomSeed;
-    return () => {
-      seed = (seed * 9301 + 49297) % 233280;
-      return seed / 233280;
-    };
-  })();
+  const seededRandom = createSeededRandom(randomSeed);
 
   // Create ropes with randomized patterns that ensure they cross each other
   for (let i = 0; i < ropeCount; i++) {
@@ -144,8 +147,8 @@ export function generateCrossedRopes(ropeCount: number, bounds: GameBounds): Rop
 
     if (ropeCount === 2) {
       // Enhanced X pattern with randomization and longer ropes
-      const randomOffset = (Math.random() - 0.5) * 0.4; // Random offset for variation
-      const lengthVariation = 0.9 + Math.random() * 0.2; // 90-110% of max length
+      const randomOffset = (seededRandom() - 0.5) * 0.4; // Random offset for variation
+      const lengthVariation = 0.9 + seededRandom() * 0.2; // 90-110% of max length
       
       if (i === 0) {
         const angle1 = Math.PI * 0.25 + randomOffset; // ~45 degrees with variation
@@ -173,35 +176,35 @@ export function generateCrossedRopes(ropeCount: number, bounds: GameBounds): Rop
     } else if (ropeCount === 3) {
       // Randomized triangle with crossing lines - longer ropes
       const baseAngle = (i * 2 * Math.PI) / 3;
-      const angleVariation = (Math.random() - 0.5) * 0.6; // ±30 degree variation
-      const lengthVariation = 0.85 + Math.random() * 0.3; // 85-115% of max length
+      const angleVariation = (seededRandom() - 0.5) * 0.6; // ±30 degree variation
+      const lengthVariation = 0.85 + seededRandom() * 0.3; // 85-115% of max length
       
       const angle = baseAngle + angleVariation;
-      const oppositeAngle = angle + Math.PI + (Math.random() - 0.5) * 0.4; // Slight variation in opposite angle
+      const oppositeAngle = angle + Math.PI + (seededRandom() - 0.5) * 0.4; // Slight variation in opposite angle
       
       start = {
         x: centerX + Math.cos(angle) * maxRadius * lengthVariation,
         y: adjustedCenterY + Math.sin(angle) * maxRadius * 0.8 * lengthVariation,
       };
       end = {
-        x: centerX + Math.cos(oppositeAngle) * maxRadius * (0.8 + Math.random() * 0.3),
-        y: adjustedCenterY + Math.sin(oppositeAngle) * maxRadius * (0.7 + Math.random() * 0.2),
+        x: centerX + Math.cos(oppositeAngle) * maxRadius * (0.8 + seededRandom() * 0.3),
+        y: adjustedCenterY + Math.sin(oppositeAngle) * maxRadius * (0.7 + seededRandom() * 0.2),
       };
     } else {
       // Enhanced complex crossing pattern with more randomization and longer ropes
       const baseAngle = (i * 2 * Math.PI) / ropeCount;
-      const angleVariation = (Math.random() - 0.5) * 0.8; // ±40 degree variation
-      const lengthVariation = 0.8 + Math.random() * 0.4; // 80-120% of max length
+      const angleVariation = (seededRandom() - 0.5) * 0.8; // ±40 degree variation
+      const lengthVariation = 0.8 + seededRandom() * 0.4; // 80-120% of max length
       
       // More random offset angle calculation
-      const offsetAngle = baseAngle + Math.PI * (0.5 + (Math.random() - 0.5) * 0.6) + angleVariation;
+      const offsetAngle = baseAngle + Math.PI * (0.5 + (seededRandom() - 0.5) * 0.6) + angleVariation;
       
       // Randomize radius for each endpoint
-      const startRadius = maxRadius * (0.7 + Math.random() * 0.4) * lengthVariation;
-      const endRadius = maxRadius * (0.6 + Math.random() * 0.5) * lengthVariation;
+      const startRadius = maxRadius * (0.7 + seededRandom() * 0.4) * lengthVariation;
+      const endRadius = maxRadius * (0.6 + seededRandom() * 0.5) * lengthVariation;
       
       // Add some randomness to the compression factor
-      const compressionFactor = 0.75 + Math.random() * 0.2; // 75-95% compression
+      const compressionFactor = 0.75 + seededRandom() * 0.2; // 75-95% compression
       
       start = {
         x: centerX + Math.cos(baseAngle + angleVariation) * startRadius,
@@ -215,10 +218,10 @@ export function generateCrossedRopes(ropeCount: number, bounds: GameBounds): Rop
 
     // Add additional randomization to final positions
     const finalRandomization = 20; // Pixels of final random adjustment
-    start.x += (Math.random() - 0.5) * finalRandomization;
-    start.y += (Math.random() - 0.5) * finalRandomization;
-    end.x += (Math.random() - 0.5) * finalRandomization;
-    end.y += (Math.random() - 0.5) * finalRandomization;
+    start.x += (seededRandom() - 0.5) * finalRandomization;
+    start.y += (seededRandom() - 0.5) * finalRandomization;
+    end.x += (seededRandom() - 0.5) * finalRandomization;
+    end.y += (seededRandom() - 0.5) * finalRandomization;
 
     // Ensure points are within bounds with padding
     const padding = 20; // Increased padding for longer ropes
@@ -295,9 +298,6 @@ export function generateCrossedRopes(ropeCount: number, bounds: GameBounds): Rop
       y: adjustedCenterY - centerRegionSize * 0.5,
     };
   }
-
-  // Reset Math.random to default behavior
-  delete Math.random;
 
   const finalIntersections = countIntersections(ropes);
   console.log(`Generated ${ropeCount} ropes with ${finalIntersections} intersections (40% longer with randomization)`);

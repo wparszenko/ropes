@@ -4,6 +4,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, RotateCcw, Lightbulb, Chrome as Home, Play, Pause, Zap } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useGameStore } from '@/store/gameStore';
+import GameBoard from '@/components/GameBoard';
+import LevelCompleteModal from '@/components/LevelCompleteModal';
+import FailureModal from '@/components/FailureModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -60,7 +63,7 @@ export default function GameScreen() {
   const handleHint = () => {
     Alert.alert(
       'Hint',
-      'Try connecting wires of the same color to their matching sockets. Avoid obstacles and make sure wires don\'t cross!',
+      'Tap on the wires to connect them to their matching colored sockets. Connect all wires to activate the portal and help the robot escape!',
       [{ text: 'Got it!' }]
     );
   };
@@ -71,6 +74,16 @@ export default function GameScreen() {
 
   const togglePause = () => {
     setIsPaused(!isPaused);
+  };
+
+  const handleNextLevel = () => {
+    setShowCompleteModal(false);
+    // Logic to advance to next level would go here
+  };
+
+  const handleRetry = () => {
+    setShowFailureModal(false);
+    resetLevel();
   };
 
   const formatTime = (seconds: number) => {
@@ -134,24 +147,8 @@ export default function GameScreen() {
           </View>
         </View>
 
-        {/* Game Board Placeholder */}
-        <View style={styles.gameBoard}>
-          <LinearGradient
-            colors={['rgba(24, 255, 146, 0.1)', 'rgba(0, 224, 255, 0.1)']}
-            style={styles.gameBoardGradient}
-          >
-            <View style={styles.gameBoardContent}>
-              <Zap size={64} color="#18FF92" />
-              <Text style={styles.gameBoardTitle}>Game Board</Text>
-              <Text style={styles.gameBoardText}>
-                Interactive puzzle game would be rendered here
-              </Text>
-              <Text style={styles.gameBoardSubtext}>
-                Wires: {levelData.wires.length} • Obstacles: {levelData.obstacles.length}
-              </Text>
-            </View>
-          </LinearGradient>
-        </View>
+        {/* Game Board */}
+        <GameBoard levelData={levelData} />
 
         {/* Bottom Controls */}
         <View style={styles.bottomControls}>
@@ -171,6 +168,22 @@ export default function GameScreen() {
           </TouchableOpacity>
         </View>
       </LinearGradient>
+
+      {/* Modals */}
+      <LevelCompleteModal
+        visible={showCompleteModal}
+        onClose={() => setShowCompleteModal(false)}
+        onNextLevel={handleNextLevel}
+        stars={3} // This would be calculated based on performance
+        level={currentLevel}
+      />
+
+      <FailureModal
+        visible={showFailureModal}
+        onClose={() => setShowFailureModal(false)}
+        onRetry={handleRetry}
+        onHome={handleHome}
+      />
     </View>
   );
 }
@@ -229,7 +242,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(26, 29, 41, 0.5)',
     marginHorizontal: 16,
     borderRadius: 12,
-    marginBottom: 16,
+    marginBottom: 8,
   },
   statItem: {
     alignItems: 'center',
@@ -244,48 +257,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  gameBoard: {
-    flex: 1,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  gameBoardGradient: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(24, 255, 146, 0.3)',
-    borderRadius: 16,
-  },
-  gameBoardContent: {
-    alignItems: 'center',
-  },
-  gameBoardTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginTop: 16,
-    fontFamily: 'System',
-  },
-  gameBoardText: {
-    fontSize: 16,
-    color: '#9CA3AF',
-    textAlign: 'center',
-    marginTop: 8,
-    paddingHorizontal: 32,
-  },
-  gameBoardSubtext: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 8,
-  },
   bottomControls: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingHorizontal: 16,
     paddingBottom: 32,
+    paddingTop: 16,
   },
   controlButton: {
     alignItems: 'center',

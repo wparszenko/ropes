@@ -28,25 +28,29 @@ export default function LevelCompleteModal({
   const hasNextLevel = isLevelUnlocked(nextLevel);
 
   const handleNextLevel = () => {
+    onClose(); // Close modal first
     if (hasNextLevel) {
       setCurrentLevel(nextLevel);
-      onClose();
       // Stay in game screen, don't navigate to levels
     } else {
       // If no next level available, go to levels screen
-      onClose();
       router.push('/levels');
     }
   };
 
   const handleHome = () => {
-    onClose();
+    onClose(); // Ensure modal is closed first
     router.push('/');
   };
 
   const handleRetry = () => {
-    onClose();
+    onClose(); // Close modal first
     resetLevel(); // Reset the current level
+  };
+
+  const handleViewLevels = () => {
+    onClose(); // Close modal first
+    router.push('/levels');
   };
 
   const getStarMessage = (stars: number, time: number) => {
@@ -122,10 +126,7 @@ export default function LevelCompleteModal({
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
-                onPress={() => {
-                  onClose();
-                  router.push('/levels');
-                }}
+                onPress={handleViewLevels}
                 style={[levelCompleteModalStyles.button, levelCompleteModalStyles.nextButton]}
               >
                 <Text style={levelCompleteModalStyles.nextButtonText}>

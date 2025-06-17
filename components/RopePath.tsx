@@ -38,7 +38,6 @@ export default function RopePath({ startPoint, endPoint, color }: RopePathProps)
     const midX = (startX + endX) / 2;
     const midY = (startY + endY) / 2;
     
-    // Dynamic arc height based on distance (more realistic rope physics)
     // Reduced arc height to minimize jumping during movement
     const arcHeight = Math.min(distance * 0.15, 50); // Reduced from 0.3 and 100
     const controlX = midX;
@@ -58,7 +57,7 @@ export default function RopePath({ startPoint, endPoint, color }: RopePathProps)
     <AnimatedPath
       animatedProps={animatedProps}
       stroke={color}
-      strokeWidth={12}
+      strokeWidth={20} // Increased from 12 to 20 for much thicker ropes
       fill="none"
       strokeLinecap="round"
       strokeLinejoin="round"

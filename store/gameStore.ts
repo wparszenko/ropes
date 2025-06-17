@@ -20,6 +20,7 @@ export interface GameSettings {
 export interface GameState {
   currentLevel: number;
   gameState: 'playing' | 'completed' | 'failed' | 'paused';
+  levelState: 'fresh' | 'playing' | 'completed' | 'failed'; // New level-specific state
   playerStats: PlayerStats;
   settings: GameSettings;
   wireConnections: { [key: string]: boolean };
@@ -31,6 +32,7 @@ export interface GameState {
 interface GameStore extends GameState {
   setCurrentLevel: (level: number) => void;
   resetLevel: () => void;
+  startLevel: () => void; // New method to explicitly start a level
   completeLevel: (stars: number) => void;
   failLevel: () => void;
   updateSettings: (newSettings: Partial<GameSettings>) => void;
@@ -50,6 +52,7 @@ interface GameStore extends GameState {
 const initialState: GameState = {
   currentLevel: 1,
   gameState: 'playing',
+  levelState: 'fresh', // New field
   playerStats: {
     completedLevels: 0,
     totalStars: 0,
@@ -77,7 +80,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (isLevelUnlocked(level)) {
       set({ 
         currentLevel: level, 
-        gameState: 'playing', 
+        gameState: 'playing',
+        levelState: 'fresh', // Reset level state
         portalActive: false,
         timeRemaining: 30,
         wireConnections: {},
@@ -86,9 +90,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
   },
 
+  startLevel: () => {
+    const { levelState } = get();
+    // Only start if level is fresh or we're explicitly restarting
+    if (levelState === 'fresh' || levelState === 'failed') {
+      set({ 
+        gameState: 'playing',
+        levelState: 'playing',
+        timeRemaining: 30,
+        wireConnections: {},
+        portalActive: false,
+        robotPosition: { x: 100, y: 100 }
+      });
+    }
+  },
+
   resetLevel: () => {
     set({ 
-      gameState: 'playing', 
+      gameState: 'playing',
+      levelState: 'fresh', // Reset to fresh state
       wireConnections: {},
       portalActive: false,
       robotPosition: { x: 100, y: 100 },
@@ -97,10 +117,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   completeLevel: (stars: number) => {
-    const { currentLevel, playerStats, getMaxStarsForLevel, gameState } = get();
+    const { currentLevel, playerStats, getMaxStarsForLevel, levelState } = get();
     
     // Only complete if currently playing to prevent multiple completions
-    if (gameState !== 'playing') return;
+    if (levelState !== 'playing') return;
     
     const maxStars = getMaxStarsForLevel(currentLevel);
     const actualStars = Math.min(stars, maxStars);
@@ -120,6 +140,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     set({ 
       gameState: 'completed',
+      levelState: 'completed',
       playerStats: newStats,
     });
     
@@ -127,10 +148,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   failLevel: () => {
-    const { gameState } = get();
+    const { levelState } = get();
     // Only fail if currently playing to prevent multiple failures
-    if (gameState === 'playing') {
-      set({ gameState: 'failed' });
+    if (levelState === 'playing') {
+      set({ 
+        gameState: 'failed',
+        levelState: 'failed'
+      });
     }
   },
 
@@ -169,6 +193,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       set({
         currentLevel: 1,
         gameState: 'playing',
+        levelState: 'fresh',
         playerStats: {
           completedLevels: 0,
           totalStars: 0,
@@ -193,6 +218,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       set({
         currentLevel: 1,
         gameState: 'playing',
+        levelState: 'fresh',
         playerStats: {
           completedLevels: 0,
           totalStars: 0,
@@ -250,15 +276,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   decrementTime: () => {
-    const { timeRemaining, gameState, failLevel } = get();
+    const { timeRemaining, levelState, failLevel } = get();
     
     // Only decrement if currently playing
-    if (gameState === 'playing' && timeRemaining > 0) {
+    if (levelState === 'playing' && timeRemaining > 0) {
       const newTime = timeRemaining - 1;
       set({ timeRemaining: newTime });
       
       // Fail level when time runs out, but only if still playing
-      if (newTime <= 0 && get().gameState === 'playing') {
+      if (newTime <= 0 && get().levelState === 'playing') {
         failLevel();
       }
     }
@@ -286,6 +312,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         set((state) => ({
           ...state,
           currentLevel: parsedState.currentLevel || 1,
+          levelState: 'fresh', // Always start fresh when loading
           playerStats: {
             ...initialState.playerStats,
             ...parsedState.playerStats,

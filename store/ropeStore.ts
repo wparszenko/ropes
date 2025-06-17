@@ -46,6 +46,7 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
 
   initializeLevel: (level: number, bounds: GameBounds) => {
     try {
+      console.log('Initializing rope level', level);
       const ropeCount = Math.min(level + 1, 10);
       const generatedRopes = generateCrossedRopes(ropeCount, bounds);
       
@@ -78,6 +79,8 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
         isInitialized: true,
         dragCount: 0,
       });
+
+      console.log('Rope level initialized with', generatedRopes.length, 'ropes and', initialIntersections, 'intersections');
     } catch (error) {
       console.error('Failed to initialize level:', error);
       // Fallback initialization
@@ -208,6 +211,7 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
   },
 
   resetLevel: () => {
+    console.log('Resetting rope level');
     const { bounds } = get();
     if (bounds) {
       // Re-initialize with current bounds
@@ -224,6 +228,7 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
   },
 
   clearAll: () => {
+    console.log('Clearing all rope data');
     set(initialState);
   },
 }));

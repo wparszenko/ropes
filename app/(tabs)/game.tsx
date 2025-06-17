@@ -60,8 +60,10 @@ export default function GameScreen() {
   const {
     currentLevel,
     gameState,
+    levelState,
     timeRemaining,
     resetLevel: resetGameLevel,
+    startLevel,
     getCurrentLevelData,
     getMaxStarsForLevel,
     setTimeRemaining,
@@ -82,27 +84,32 @@ export default function GameScreen() {
   const modalShownForLevel = useRef<number | null>(null);
   const modalClosingRef = useRef(false);
   const gameTimerRef = useRef<GameTimer | null>(null);
-  const gameStateRef = useRef(gameState);
+  const levelStateRef = useRef(levelState);
+  const levelRef = useRef(currentLevel);
 
-  // Update gameState ref when it changes
+  // Update refs when values change
   useEffect(() => {
-    gameStateRef.current = gameState;
-  }, [gameState]);
+    levelStateRef.current = levelState;
+  }, [levelState]);
+
+  useEffect(() => {
+    levelRef.current = currentLevel;
+  }, [currentLevel]);
 
   // Timer tick handler
   const handleTimerTick = useCallback(() => {
-    // Check if game is still playing before decrementing
-    if (gameStateRef.current === 'playing') {
+    // Check if level is still playing before decrementing
+    if (levelStateRef.current === 'playing') {
       decrementTime();
     } else {
-      // Stop timer if game state changed
+      // Stop timer if level state changed
       gameTimerRef.current?.stop();
     }
   }, [decrementTime]);
 
   // Timer complete handler (when time reaches 0)
   const handleTimerComplete = useCallback(() => {
-    if (gameStateRef.current === 'playing') {
+    if (levelStateRef.current === 'playing') {
       failLevel();
     }
   }, [failLevel]);
@@ -119,37 +126,52 @@ export default function GameScreen() {
     };
   }, [handleTimerTick, handleTimerComplete]);
 
-  // Start/stop timer based on game state
+  // Reset level data and timer when level changes
+  useEffect(() => {
+    const data = getCurrentLevelData();
+    setLevelData(data);
+    
+    // Reset modal tracking for new level
+    modalShownForLevel.current = null;
+    setShowCompleteModal(false);
+    setShowFailedModal(false);
+    modalClosingRef.current = false;
+    
+    // Reset timer to 30 seconds for new level
+    setTimeRemaining(30);
+  }, [currentLevel, getCurrentLevelData, setTimeRemaining]);
+
+  // Start timer when level state becomes 'playing'
   useEffect(() => {
     const timer = gameTimerRef.current;
     if (!timer) return;
 
-    if (gameState === 'playing') {
-      // Start timer when playing
+    if (levelState === 'playing') {
+      // Start timer when level is playing
+      console.log('Starting timer for level', currentLevel);
       timer.start();
     } else {
-      // Stop timer when not playing (completed, failed, paused)
+      // Stop timer when level is not playing
+      console.log('Stopping timer, level state:', levelState);
       timer.stop();
     }
-  }, [gameState]);
+  }, [levelState, currentLevel]);
 
-  // Handle time reaching zero
+  // Auto-start level when it's fresh and game board is ready
   useEffect(() => {
-    if (timeRemaining <= 0 && gameState === 'playing') {
-      gameTimerRef.current?.stop();
-      failLevel();
+    if (levelState === 'fresh' && ropes.length > 0) {
+      // Small delay to ensure everything is initialized
+      setTimeout(() => {
+        console.log('Auto-starting fresh level', currentLevel);
+        startLevel();
+      }, 500);
     }
-  }, [timeRemaining, gameState, failLevel]);
-
-  useEffect(() => {
-    const data = getCurrentLevelData();
-    setLevelData(data);
-  }, [currentLevel]);
+  }, [levelState, ropes.length, currentLevel, startLevel]);
 
   // Handle level completion with new star system
   useEffect(() => {
     if (
-      gameState === 'completed' && 
+      levelState === 'completed' && 
       !showCompleteModal && 
       !modalClosingRef.current &&
       modalShownForLevel.current !== currentLevel
@@ -174,19 +196,16 @@ export default function GameScreen() {
       
       setModalStars(earnedStars);
       
-      // Complete level with calculated stars
-      completeLevel(earnedStars);
-      
       // Show modal immediately
       setShowCompleteModal(true);
       modalShownForLevel.current = currentLevel;
     }
-  }, [gameState, showCompleteModal, currentLevel, timeRemaining, completeLevel]);
+  }, [levelState, showCompleteModal, currentLevel, timeRemaining]);
 
-  // Handle level failure - only show when actually playing and stop timer
+  // Handle level failure - only show when actually failed and stop timer
   useEffect(() => {
     if (
-      gameState === 'failed' && 
+      levelState === 'failed' && 
       !showFailedModal && 
       !modalClosingRef.current &&
       modalShownForLevel.current !== currentLevel
@@ -197,16 +216,7 @@ export default function GameScreen() {
       setShowFailedModal(true);
       modalShownForLevel.current = currentLevel;
     }
-  }, [gameState, showFailedModal, currentLevel]);
-
-  // Reset modal tracking when level changes
-  useEffect(() => {
-    modalShownForLevel.current = null;
-    setShowCompleteModal(false);
-    setShowFailedModal(false);
-    modalClosingRef.current = false;
-    setTimeRemaining(30); // Reset timer for new level
-  }, [currentLevel, setTimeRemaining]);
+  }, [levelState, showFailedModal, currentLevel]);
 
   const handleBack = () => {
     // Stop and destroy timer when leaving game
@@ -215,6 +225,8 @@ export default function GameScreen() {
   };
 
   const handleReset = () => {
+    console.log('Reset button clicked');
+    
     // Stop timer during reset
     gameTimerRef.current?.stop();
 
@@ -224,11 +236,12 @@ export default function GameScreen() {
     modalShownForLevel.current = null;
     
     // Reset both game and rope stores to restart the current level
-    resetGameLevel();
+    resetGameLevel(); // This sets levelState to 'fresh'
     resetRopeLevel();
     
     setTimeout(() => {
       modalClosingRef.current = false;
+      // The level will auto-start due to the useEffect above
     }, 200);
   };
 
@@ -335,6 +348,15 @@ export default function GameScreen() {
               color: intersectionCount === 0 ? '#18FF92' : '#FF5050'
             }]}>
               {intersectionCount}
+            </Text>
+          </View>
+          <View style={gameScreenStyles.statItem}>
+            <Text style={gameScreenStyles.statLabel}>State</Text>
+            <Text style={[gameScreenStyles.statValue, { 
+              color: levelState === 'playing' ? '#18FF92' : '#FFE347',
+              fontSize: 12
+            }]}>
+              {levelState}
             </Text>
           </View>
         </View>

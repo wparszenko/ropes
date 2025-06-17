@@ -15,7 +15,8 @@ export interface RopeState {
   isCompleted: boolean;
   bounds: GameBounds | null;
   isDragging: boolean;
-  isInitialized: boolean; // Add initialization tracking
+  isInitialized: boolean;
+  dragCount: number; // Track number of active drags
 }
 
 interface RopeStore extends RopeState {
@@ -25,7 +26,8 @@ interface RopeStore extends RopeState {
   resetLevel: () => void;
   getCurrentRopes: () => Rope[];
   setDragging: (dragging: boolean) => void;
-  clearAll: () => void; // Add method to clear all data
+  clearAll: () => void;
+  validatePositions: () => void; // Add position validation
 }
 
 const initialState: RopeState = {
@@ -36,6 +38,7 @@ const initialState: RopeState = {
   bounds: null,
   isDragging: false,
   isInitialized: false,
+  dragCount: 0,
 };
 
 export const useRopeStore = create<RopeStore>((set, get) => ({
@@ -46,14 +49,20 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
       const ropeCount = Math.min(level + 1, 10);
       const generatedRopes = generateCrossedRopes(ropeCount, bounds);
       
-      // Initialize positions from generated ropes
+      // Initialize positions from generated ropes with validation
       const positions: { [ropeId: string]: RopePosition } = {};
       generatedRopes.forEach(rope => {
+        // Validate rope positions
+        const startX = isNaN(rope.start.x) ? bounds.minX + 50 : rope.start.x;
+        const startY = isNaN(rope.start.y) ? bounds.minY + 50 : rope.start.y;
+        const endX = isNaN(rope.end.x) ? bounds.maxX - 50 : rope.end.x;
+        const endY = isNaN(rope.end.y) ? bounds.maxY - 50 : rope.end.y;
+        
         positions[rope.id] = {
-          startX: rope.start.x,
-          startY: rope.start.y,
-          endX: rope.end.x,
-          endY: rope.end.y,
+          startX: Math.max(bounds.minX, Math.min(bounds.maxX, startX)),
+          startY: Math.max(bounds.minY, Math.min(bounds.maxY, startY)),
+          endX: Math.max(bounds.minX, Math.min(bounds.maxX, endX)),
+          endY: Math.max(bounds.minY, Math.min(bounds.maxY, endY)),
         };
       });
 
@@ -66,7 +75,8 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
         isCompleted: false,
         bounds,
         isDragging: false,
-        isInitialized: true, // Mark as initialized
+        isInitialized: true,
+        dragCount: 0,
       });
     } catch (error) {
       console.error('Failed to initialize level:', error);
@@ -79,6 +89,7 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
         bounds,
         isDragging: false,
         isInitialized: true,
+        dragCount: 0,
       });
     }
   },
@@ -87,21 +98,43 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
     const state = get();
     const currentPosition = state.ropePositions[ropeId];
     
-    if (!currentPosition) return;
+    if (!currentPosition || !state.bounds) return;
+
+    // Validate new position values
+    const validatedPosition: Partial<RopePosition> = {};
+    
+    if (position.startX !== undefined) {
+      validatedPosition.startX = isNaN(position.startX) ? currentPosition.startX : 
+        Math.max(state.bounds.minX, Math.min(state.bounds.maxX, position.startX));
+    }
+    if (position.startY !== undefined) {
+      validatedPosition.startY = isNaN(position.startY) ? currentPosition.startY : 
+        Math.max(state.bounds.minY, Math.min(state.bounds.maxY, position.startY));
+    }
+    if (position.endX !== undefined) {
+      validatedPosition.endX = isNaN(position.endX) ? currentPosition.endX : 
+        Math.max(state.bounds.minX, Math.min(state.bounds.maxX, position.endX));
+    }
+    if (position.endY !== undefined) {
+      validatedPosition.endY = isNaN(position.endY) ? currentPosition.endY : 
+        Math.max(state.bounds.minY, Math.min(state.bounds.maxY, position.endY));
+    }
 
     const newPositions = {
       ...state.ropePositions,
       [ropeId]: {
         ...currentPosition,
-        ...position,
+        ...validatedPosition,
       },
     };
 
     set({ ropePositions: newPositions });
     
     // Only check intersections if not currently dragging
-    if (!state.isDragging) {
-      get().checkIntersections();
+    if (state.dragCount === 0) {
+      setTimeout(() => {
+        get().checkIntersections();
+      }, 50); // Small delay to batch updates
     }
   },
 
@@ -109,7 +142,7 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
     const state = get();
     const currentRopes = get().getCurrentRopes();
     const newIntersectionCount = countIntersections(currentRopes);
-    const isCompleted = newIntersectionCount === 0 && currentRopes.length > 0 && !state.isDragging;
+    const isCompleted = newIntersectionCount === 0 && currentRopes.length > 0 && state.dragCount === 0;
 
     set({
       intersectionCount: newIntersectionCount,
@@ -135,14 +168,43 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
   },
 
   setDragging: (dragging: boolean) => {
-    set({ isDragging: dragging });
+    const state = get();
+    const newDragCount = dragging ? state.dragCount + 1 : Math.max(0, state.dragCount - 1);
+    const isDragging = newDragCount > 0;
     
-    // Check intersections when dragging ends
-    if (!dragging) {
+    set({ 
+      isDragging,
+      dragCount: newDragCount,
+    });
+    
+    // Check intersections when all dragging ends
+    if (newDragCount === 0) {
       setTimeout(() => {
         get().checkIntersections();
       }, 100); // Small delay to ensure position updates are complete
     }
+  },
+
+  validatePositions: () => {
+    const state = get();
+    if (!state.bounds) return;
+    
+    const validatedPositions: { [ropeId: string]: RopePosition } = {};
+    
+    Object.entries(state.ropePositions).forEach(([ropeId, position]) => {
+      validatedPositions[ropeId] = {
+        startX: Math.max(state.bounds!.minX, Math.min(state.bounds!.maxX, 
+          isNaN(position.startX) ? state.bounds!.minX + 50 : position.startX)),
+        startY: Math.max(state.bounds!.minY, Math.min(state.bounds!.maxY, 
+          isNaN(position.startY) ? state.bounds!.minY + 50 : position.startY)),
+        endX: Math.max(state.bounds!.minX, Math.min(state.bounds!.maxX, 
+          isNaN(position.endX) ? state.bounds!.maxX - 50 : position.endX)),
+        endY: Math.max(state.bounds!.minY, Math.min(state.bounds!.maxY, 
+          isNaN(position.endY) ? state.bounds!.maxY - 50 : position.endY)),
+      };
+    });
+    
+    set({ ropePositions: validatedPositions });
   },
 
   resetLevel: () => {

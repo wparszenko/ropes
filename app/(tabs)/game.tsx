@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Dimensions, Alert, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Dimensions, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, RotateCcw, Lightbulb, Chrome as Home } from 'lucide-react-native';
 import { router } from 'expo-router';
@@ -7,6 +7,7 @@ import { useGameStore } from '@/store/gameStore';
 import { useRopeStore } from '@/store/ropeStore';
 import GameBoard from '@/components/GameBoard';
 import LevelCompleteModal from '@/components/LevelCompleteModal';
+import { gameScreenStyles } from '@/styles/gameScreenStyles';
 
 const { width, height } = Dimensions.get('window');
 
@@ -81,10 +82,10 @@ export default function GameScreen() {
 
   if (!levelData) {
     return (
-      <View style={styles.container}>
-        <LinearGradient colors={['#0F1117', '#1A1D29']} style={styles.gradient}>
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading Level {currentLevel}...</Text>
+      <View style={gameScreenStyles.container}>
+        <LinearGradient colors={['#0F1117', '#1A1D29']} style={gameScreenStyles.gradient}>
+          <View style={gameScreenStyles.loadingContainer}>
+            <Text style={gameScreenStyles.loadingText}>Loading Level {currentLevel}...</Text>
           </View>
         </LinearGradient>
       </View>
@@ -94,39 +95,39 @@ export default function GameScreen() {
   const ropeCount = ropes.length || Math.min(currentLevel + 1, 10);
 
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={['#0F1117', '#1A1D29']} style={styles.gradient}>
+    <View style={gameScreenStyles.container}>
+      <LinearGradient colors={['#0F1117', '#1A1D29']} style={gameScreenStyles.gradient}>
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.headerButton}>
+        <View style={gameScreenStyles.header}>
+          <TouchableOpacity onPress={handleBack} style={gameScreenStyles.headerButton}>
             <ArrowLeft size={24} color="#64748B" />
           </TouchableOpacity>
 
-          <View style={styles.headerCenter}>
-            <Text style={styles.levelTitle}>LEVEL {currentLevel}</Text>
-            <Text style={styles.levelSubtitle}>
+          <View style={gameScreenStyles.headerCenter}>
+            <Text style={gameScreenStyles.levelTitle}>LEVEL {currentLevel}</Text>
+            <Text style={gameScreenStyles.levelSubtitle}>
               Untangle {ropeCount} Ropes
             </Text>
           </View>
 
-          <TouchableOpacity onPress={handleHome} style={styles.headerButton}>
+          <TouchableOpacity onPress={handleHome} style={gameScreenStyles.headerButton}>
             <Home size={24} color="#64748B" />
           </TouchableOpacity>
         </View>
 
         {/* Game Stats */}
-        <View style={styles.gameStats}>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Time</Text>
-            <Text style={styles.statValue}>{formatTime(gameTime)}</Text>
+        <View style={gameScreenStyles.gameStats}>
+          <View style={gameScreenStyles.statItem}>
+            <Text style={gameScreenStyles.statLabel}>Time</Text>
+            <Text style={gameScreenStyles.statValue}>{formatTime(gameTime)}</Text>
           </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Ropes</Text>
-            <Text style={styles.statValue}>{ropeCount}</Text>
+          <View style={gameScreenStyles.statItem}>
+            <Text style={gameScreenStyles.statLabel}>Ropes</Text>
+            <Text style={gameScreenStyles.statValue}>{ropeCount}</Text>
           </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Crossings</Text>
-            <Text style={[styles.statValue, { 
+          <View style={gameScreenStyles.statItem}>
+            <Text style={gameScreenStyles.statLabel}>Crossings</Text>
+            <Text style={[gameScreenStyles.statValue, { 
               color: intersectionCount === 0 ? '#18FF92' : '#FF5050'
             }]}>
               {intersectionCount}
@@ -138,15 +139,15 @@ export default function GameScreen() {
         <GameBoard levelData={levelData} />
 
         {/* Bottom Controls */}
-        <View style={styles.bottomControls}>
-          <TouchableOpacity onPress={handleReset} style={[styles.controlButton, styles.resetButton]}>
+        <View style={gameScreenStyles.bottomControls}>
+          <TouchableOpacity onPress={handleReset} style={[gameScreenStyles.controlButton, gameScreenStyles.resetButton]}>
             <RotateCcw size={24} color="#FF5050" />
-            <Text style={styles.controlButtonText}>Reset</Text>
+            <Text style={gameScreenStyles.controlButtonText}>Reset</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={handleHint} style={[styles.controlButton, styles.hintButton]}>
+          <TouchableOpacity onPress={handleHint} style={[gameScreenStyles.controlButton, gameScreenStyles.hintButton]}>
             <Lightbulb size={24} color="#FFE347" />
-            <Text style={styles.controlButtonText}>Hint</Text>
+            <Text style={gameScreenStyles.controlButtonText}>Hint</Text>
           </TouchableOpacity>
         </View>
       </LinearGradient>
@@ -162,102 +163,3 @@ export default function GameScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0F1117',
-  },
-  gradient: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 18,
-    color: '#FFFFFF',
-    marginTop: 16,
-    fontWeight: '600',
-  },
-  header: {
-    paddingTop: 60,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerButton: {
-    backgroundColor: 'rgba(26, 29, 41, 0.8)',
-    borderRadius: 12,
-    padding: 12,
-  },
-  headerCenter: {
-    alignItems: 'center',
-  },
-  levelTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    fontFamily: 'System',
-  },
-  levelSubtitle: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginTop: 2,
-  },
-  gameStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: 'rgba(26, 29, 41, 0.5)',
-    marginHorizontal: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginBottom: 4,
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  bottomControls: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 16,
-    paddingBottom: 32,
-    paddingTop: 16,
-  },
-  controlButton: {
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    minWidth: 100,
-    borderWidth: 2,
-  },
-  resetButton: {
-    backgroundColor: 'rgba(255, 80, 80, 0.1)',
-    borderColor: '#FF5050',
-  },
-  hintButton: {
-    backgroundColor: 'rgba(255, 227, 71, 0.1)',
-    borderColor: '#FFE347',
-  },
-  controlButtonText: {
-    fontSize: 12,
-    color: '#FFFFFF',
-    marginTop: 4,
-    fontWeight: '600',
-  },
-});

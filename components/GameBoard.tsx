@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback, useMemo } from 'react';
-import { View, StyleSheet, Dimensions, Platform, Text } from 'react-native';
+import { View, Text, Dimensions, Platform } from 'react-native';
 import { Svg } from 'react-native-svg';
 import { useSharedValue } from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -8,6 +8,7 @@ import RopePath from '@/components/RopePath';
 import { type GameBounds } from '@/utils/ropeGenerator';
 import { useGameStore } from '@/store/gameStore';
 import { useRopeStore } from '@/store/ropeStore';
+import { gameBoardStyles } from '@/styles/gameBoardStyles';
 
 const { width, height } = Dimensions.get('window');
 
@@ -32,6 +33,8 @@ interface GameBoardProps {
   levelData?: any;
 }
 
+const MAX_ROPES = 20; // Maximum number of ropes we might ever have
+
 export default function GameBoard({ levelData }: GameBoardProps) {
   const { currentLevel, completeLevel } = useGameStore();
   const { 
@@ -44,28 +47,28 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     checkIntersections 
   } = useRopeStore();
 
-  // Create all shared values at the top level to maintain hook order
+  // Create a fixed number of shared values at the top level
+  // This ensures the number of hook calls remains constant
   const sharedValues = useMemo(() => {
-    const values: { [ropeId: string]: any } = {};
-    ropes.forEach(rope => {
-      const position = ropePositions[rope.id];
-      if (position) {
-        values[rope.id] = {
-          startX: useSharedValue(position.startX),
-          startY: useSharedValue(position.startY),
-          endX: useSharedValue(position.endX),
-          endY: useSharedValue(position.endY),
-        };
-      }
-    });
+    const values: { [key: string]: any } = {};
+    for (let i = 0; i < MAX_ROPES; i++) {
+      const ropeId = `rope-${i}`;
+      values[ropeId] = {
+        startX: useSharedValue(0),
+        startY: useSharedValue(0),
+        endX: useSharedValue(0),
+        endY: useSharedValue(0),
+      };
+    }
     return values;
-  }, [ropes.length]); // Only recreate when rope count changes
+  }, []); // Empty dependency array - only create once
 
   // Update shared values when positions change
   useEffect(() => {
-    ropes.forEach(rope => {
+    ropes.forEach((rope, index) => {
       const position = ropePositions[rope.id];
-      const shared = sharedValues[rope.id];
+      const sharedKey = `rope-${index}`;
+      const shared = sharedValues[sharedKey];
       if (position && shared) {
         shared.startX.value = position.startX;
         shared.startY.value = position.startY;
@@ -102,21 +105,22 @@ export default function GameBoard({ levelData }: GameBoardProps) {
   // Early return after all hooks have been called
   if (ropes.length === 0) {
     return (
-      <View style={[styles.container, { height: BOARD_HEIGHT }]}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading Level {currentLevel}...</Text>
+      <View style={[gameBoardStyles.container, { height: BOARD_HEIGHT }]}>
+        <View style={gameBoardStyles.loadingContainer}>
+          <Text style={gameBoardStyles.loadingText}>Loading Level {currentLevel}...</Text>
         </View>
       </View>
     );
   }
 
   const containerContent = (
-    <View style={[styles.container, { height: BOARD_HEIGHT }]}>
+    <View style={[gameBoardStyles.container, { height: BOARD_HEIGHT }]}>
       {/* SVG Layer - Behind dots */}
-      <View style={styles.svgContainer}>
-        <Svg width={BOARD_WIDTH} height={BOARD_HEIGHT} style={styles.svg}>
-          {ropes.map(rope => {
-            const shared = sharedValues[rope.id];
+      <View style={gameBoardStyles.svgContainer}>
+        <Svg width={BOARD_WIDTH} height={BOARD_HEIGHT} style={gameBoardStyles.svg}>
+          {ropes.map((rope, index) => {
+            const sharedKey = `rope-${index}`;
+            const shared = sharedValues[sharedKey];
             if (!shared) return null;
             
             return (
@@ -132,9 +136,10 @@ export default function GameBoard({ levelData }: GameBoardProps) {
       </View>
 
       {/* Dots Layer - Above SVG */}
-      <View style={styles.dotsContainer}>
-        {ropes.map(rope => {
-          const shared = sharedValues[rope.id];
+      <View style={gameBoardStyles.dotsContainer}>
+        {ropes.map((rope, index) => {
+          const sharedKey = `rope-${index}`;
+          const shared = sharedValues[sharedKey];
           if (!shared) return null;
 
           return (
@@ -171,15 +176,15 @@ export default function GameBoard({ levelData }: GameBoardProps) {
       </View>
 
       {/* Visual boundary indicator */}
-      <View style={styles.boundaryIndicator} />
+      <View style={gameBoardStyles.boundaryIndicator} />
       
       {/* Intersection counter for debugging */}
       {__DEV__ && (
-        <View style={styles.debugInfo}>
-          <View style={styles.debugText}>
-            <Text style={styles.debugLabel}>Intersections: {intersectionCount}</Text>
-            <Text style={styles.debugLabel}>Ropes: {ropes.length}</Text>
-            <Text style={styles.debugLabel}>Completed: {isCompleted ? 'Yes' : 'No'}</Text>
+        <View style={gameBoardStyles.debugInfo}>
+          <View style={gameBoardStyles.debugText}>
+            <Text style={gameBoardStyles.debugLabel}>Intersections: {intersectionCount}</Text>
+            <Text style={gameBoardStyles.debugLabel}>Ropes: {ropes.length}</Text>
+            <Text style={gameBoardStyles.debugLabel}>Completed: {isCompleted ? 'Yes' : 'No'}</Text>
           </View>
         </View>
       )}
@@ -189,102 +194,15 @@ export default function GameBoard({ levelData }: GameBoardProps) {
   // For web, don't wrap in GestureHandlerRootView as it can interfere
   if (Platform.OS === 'web') {
     return (
-      <View style={styles.wrapper}>
+      <View style={gameBoardStyles.wrapper}>
         {containerContent}
       </View>
     );
   }
 
   return (
-    <GestureHandlerRootView style={styles.wrapper}>
+    <GestureHandlerRootView style={gameBoardStyles.wrapper}>
       {containerContent}
     </GestureHandlerRootView>
   );
 }
-
-const styles = StyleSheet.create({
-  wrapper: {
-    flex: 1,
-    minHeight: 400,
-  },
-  container: {
-    backgroundColor: 'rgba(15, 17, 23, 0.5)',
-    borderRadius: 16,
-    marginHorizontal: BOARD_MARGIN,
-    marginVertical: 8,
-    borderWidth: 2,
-    borderColor: 'rgba(24, 255, 146, 0.3)',
-    overflow: 'hidden',
-    position: 'relative',
-    flex: 1,
-    shadowColor: '#18FF92',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 18,
-    color: '#FFFFFF',
-    marginTop: 16,
-    fontWeight: '600',
-  },
-  svgContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1,
-    pointerEvents: 'none',
-  },
-  svg: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-  },
-  dotsContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 2,
-    pointerEvents: 'box-none',
-  },
-  boundaryIndicator: {
-    position: 'absolute',
-    top: BOARD_PADDING,
-    left: BOARD_PADDING,
-    right: BOARD_PADDING,
-    bottom: BOARD_PADDING,
-    borderWidth: 1,
-    borderColor: 'rgba(24, 255, 146, 0.1)',
-    borderRadius: 8,
-    borderStyle: 'dashed',
-    pointerEvents: 'none',
-    zIndex: 0,
-  },
-  debugInfo: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    zIndex: 3,
-    pointerEvents: 'none',
-  },
-  debugText: {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 8,
-    borderRadius: 4,
-  },
-  debugLabel: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-});

@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Star, ArrowRight, Chrome as Home, RotateCcw } from 'lucide-react-native';
+import { levelCompleteModalStyles } from '@/styles/levelCompleteModalStyles';
 
 interface LevelCompleteModalProps {
   visible: boolean;
@@ -25,23 +26,23 @@ export default function LevelCompleteModal({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
+      <View style={levelCompleteModalStyles.overlay}>
         <LinearGradient
           colors={['#1A1D29', '#0F1117']}
-          style={styles.modal}
+          style={levelCompleteModalStyles.modal}
         >
           {/* Success Header */}
-          <View style={styles.header}>
-            <Text style={styles.title}>
+          <View style={levelCompleteModalStyles.header}>
+            <Text style={levelCompleteModalStyles.title}>
               ROPES UNTANGLED!
             </Text>
-            <Text style={styles.subtitle}>
+            <Text style={levelCompleteModalStyles.subtitle}>
               Level {level} Complete
             </Text>
           </View>
 
           {/* Stars */}
-          <View style={styles.starsContainer}>
+          <View style={levelCompleteModalStyles.starsContainer}>
             {[1, 2, 3].map((star) => (
               <Star
                 key={star}
@@ -53,49 +54,49 @@ export default function LevelCompleteModal({
           </View>
 
           {/* Performance Stats */}
-          <View style={styles.statsContainer}>
-            <Text style={styles.statsTitle}>
+          <View style={levelCompleteModalStyles.statsContainer}>
+            <Text style={levelCompleteModalStyles.statsTitle}>
               Performance
             </Text>
-            <View style={styles.statRow}>
-              <Text style={styles.statLabel}>Time:</Text>
-              <Text style={styles.statValue}>1:23</Text>
+            <View style={levelCompleteModalStyles.statRow}>
+              <Text style={levelCompleteModalStyles.statLabel}>Time:</Text>
+              <Text style={levelCompleteModalStyles.statValue}>1:23</Text>
             </View>
-            <View style={styles.statRow}>
-              <Text style={styles.statLabel}>Moves:</Text>
-              <Text style={styles.statValue}>12</Text>
+            <View style={levelCompleteModalStyles.statRow}>
+              <Text style={levelCompleteModalStyles.statLabel}>Moves:</Text>
+              <Text style={levelCompleteModalStyles.statValue}>12</Text>
             </View>
           </View>
 
           {/* Action Buttons */}
-          <View style={styles.buttonContainer}>
+          <View style={levelCompleteModalStyles.buttonContainer}>
             <TouchableOpacity
               onPress={onNextLevel}
-              style={[styles.button, styles.nextButton]}
+              style={[levelCompleteModalStyles.button, levelCompleteModalStyles.nextButton]}
             >
-              <Text style={styles.nextButtonText}>
+              <Text style={levelCompleteModalStyles.nextButtonText}>
                 NEXT LEVEL
               </Text>
               <ArrowRight size={24} color="#18FF92" />
             </TouchableOpacity>
 
-            <View style={styles.secondaryButtons}>
+            <View style={levelCompleteModalStyles.secondaryButtons}>
               <TouchableOpacity
                 onPress={onClose}
-                style={[styles.button, styles.secondaryButton]}
+                style={[levelCompleteModalStyles.button, levelCompleteModalStyles.secondaryButton]}
               >
                 <RotateCcw size={20} color="#64748B" />
-                <Text style={styles.secondaryButtonText}>
+                <Text style={levelCompleteModalStyles.secondaryButtonText}>
                   RETRY
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={onClose}
-                style={[styles.button, styles.secondaryButton]}
+                style={[levelCompleteModalStyles.button, levelCompleteModalStyles.secondaryButton]}
               >
                 <Home size={20} color="#64748B" />
-                <Text style={styles.secondaryButtonText}>
+                <Text style={levelCompleteModalStyles.secondaryButtonText}>
                   HOME
                 </Text>
               </TouchableOpacity>
@@ -106,107 +107,3 @@ export default function LevelCompleteModal({
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  modal: {
-    backgroundColor: '#1A1D29',
-    borderRadius: 24,
-    padding: 32,
-    width: '100%',
-    maxWidth: 400,
-    borderWidth: 2,
-    borderColor: 'rgba(24, 255, 146, 0.3)',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  title: {
-    color: '#18FF92',
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 8,
-    fontFamily: 'System',
-  },
-  subtitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-  },
-  starsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 32,
-    gap: 8,
-  },
-  statsContainer: {
-    backgroundColor: 'rgba(15, 17, 23, 0.5)',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 24,
-  },
-  statsTitle: {
-    color: '#FFFFFF',
-    textAlign: 'center',
-    fontWeight: '600',
-    marginBottom: 8,
-    fontSize: 16,
-  },
-  statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 2,
-  },
-  statLabel: {
-    color: '#9CA3AF',
-    fontSize: 14,
-  },
-  statValue: {
-    color: '#00E0FF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  buttonContainer: {
-    gap: 12,
-  },
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 2,
-  },
-  nextButton: {
-    backgroundColor: 'rgba(24, 255, 146, 0.2)',
-    borderColor: '#18FF92',
-  },
-  nextButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-    marginRight: 8,
-    fontFamily: 'System',
-  },
-  secondaryButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  secondaryButton: {
-    flex: 1,
-    backgroundColor: 'rgba(26, 29, 41, 0.8)',
-    borderColor: '#2D3748',
-  },
-  secondaryButtonText: {
-    color: '#9CA3AF',
-    fontWeight: '600',
-    marginLeft: 8,
-    fontSize: 14,
-  },
-});

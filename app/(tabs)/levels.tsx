@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Dimensions, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Star, Lock, Trophy, Target, Clock } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useGameStore } from '@/store/gameStore';
+import { levelsScreenStyles } from '@/styles/levelsScreenStyles';
 
 const { width } = Dimensions.get('window');
 const LEVELS_PER_ROW = 4;
@@ -36,18 +37,18 @@ export default function LevelsScreen() {
         onPress={() => handleLevelSelect(level)}
         disabled={!isUnlocked}
         style={[
-          styles.levelButton,
+          levelsScreenStyles.levelButton,
           {
             width: LEVEL_SIZE - 8,
             height: LEVEL_SIZE - 8,
           },
           isUnlocked
             ? isCurrent
-              ? styles.currentLevel
+              ? levelsScreenStyles.currentLevel
               : isCompleted
-              ? styles.completedLevel
-              : styles.unlockedLevel
-            : styles.lockedLevel,
+              ? levelsScreenStyles.completedLevel
+              : levelsScreenStyles.unlockedLevel
+            : levelsScreenStyles.lockedLevel,
         ]}
       >
         {!isUnlocked ? (
@@ -56,7 +57,7 @@ export default function LevelsScreen() {
           <>
             <Text
               style={[
-                styles.levelNumber,
+                levelsScreenStyles.levelNumber,
                 {
                   color: isCurrent
                     ? '#FFE347'
@@ -69,7 +70,7 @@ export default function LevelsScreen() {
               {level}
             </Text>
             {isCompleted && stars > 0 && (
-              <View style={styles.starsContainer}>
+              <View style={levelsScreenStyles.starsContainer}>
                 {[1, 2, 3].map((star) => (
                   <Star
                     key={star}
@@ -81,8 +82,8 @@ export default function LevelsScreen() {
               </View>
             )}
             {isCurrent && (
-              <View style={styles.currentIndicator}>
-                <View style={styles.currentDot} />
+              <View style={levelsScreenStyles.currentIndicator}>
+                <View style={levelsScreenStyles.currentDot} />
               </View>
             )}
           </>
@@ -101,64 +102,64 @@ export default function LevelsScreen() {
     const worldPercentage = Math.max(0, Math.round((worldProgress / (endLevel - startLevel + 1)) * 100));
 
     return (
-      <View key={worldNumber} style={styles.worldContainer}>
-        <View style={styles.worldHeader}>
-          <Text style={styles.worldTitle}>WORLD {worldNumber}</Text>
-          <View style={styles.worldProgress}>
-            <Text style={styles.worldProgressText}>{worldPercentage}%</Text>
+      <View key={worldNumber} style={levelsScreenStyles.worldContainer}>
+        <View style={levelsScreenStyles.worldHeader}>
+          <Text style={levelsScreenStyles.worldTitle}>WORLD {worldNumber}</Text>
+          <View style={levelsScreenStyles.worldProgress}>
+            <Text style={levelsScreenStyles.worldProgressText}>{worldPercentage}%</Text>
           </View>
         </View>
-        <View style={styles.levelsGrid}>{levels}</View>
+        <View style={levelsScreenStyles.levelsGrid}>{levels}</View>
       </View>
     );
   };
 
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={['#0F1117', '#1A1D29']} style={styles.gradient}>
+    <View style={levelsScreenStyles.container}>
+      <LinearGradient colors={['#0F1117', '#1A1D29']} style={levelsScreenStyles.gradient}>
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+        <View style={levelsScreenStyles.header}>
+          <TouchableOpacity onPress={handleBack} style={levelsScreenStyles.backButton}>
             <ArrowLeft size={24} color="#64748B" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>LEVEL SELECT</Text>
-          <View style={styles.headerSpacer} />
+          <Text style={levelsScreenStyles.headerTitle}>LEVEL SELECT</Text>
+          <View style={levelsScreenStyles.headerSpacer} />
         </View>
 
         {/* Progress Stats */}
-        <View style={styles.progressCard}>
-          <View style={styles.progressStats}>
-            <View style={styles.progressStat}>
+        <View style={levelsScreenStyles.progressCard}>
+          <View style={levelsScreenStyles.progressStats}>
+            <View style={levelsScreenStyles.progressStat}>
               <Trophy size={20} color="#18FF92" />
-              <Text style={styles.progressStatValue}>{playerStats.completedLevels}</Text>
-              <Text style={styles.progressStatLabel}>Completed</Text>
+              <Text style={levelsScreenStyles.progressStatValue}>{playerStats.completedLevels}</Text>
+              <Text style={levelsScreenStyles.progressStatLabel}>Completed</Text>
             </View>
-            <View style={styles.progressStat}>
+            <View style={levelsScreenStyles.progressStat}>
               <Star size={20} color="#FFE347" />
-              <Text style={styles.progressStatValue}>{playerStats.totalStars}</Text>
-              <Text style={styles.progressStatLabel}>Stars</Text>
+              <Text style={levelsScreenStyles.progressStatValue}>{playerStats.totalStars}</Text>
+              <Text style={levelsScreenStyles.progressStatLabel}>Stars</Text>
             </View>
-            <View style={styles.progressStat}>
+            <View style={levelsScreenStyles.progressStat}>
               <Target size={20} color="#00E0FF" />
-              <Text style={styles.progressStatValue}>
+              <Text style={levelsScreenStyles.progressStatValue}>
                 {Math.round((playerStats.completedLevels / totalLevels) * 100)}%
               </Text>
-              <Text style={styles.progressStatLabel}>Progress</Text>
+              <Text style={levelsScreenStyles.progressStatLabel}>Progress</Text>
             </View>
           </View>
         </View>
 
         {/* Levels Grid */}
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <ScrollView style={levelsScreenStyles.scrollView} showsVerticalScrollIndicator={false}>
           {renderWorld(1, 1, 10)}
           {renderWorld(2, 11, 20)}
           {renderWorld(3, 21, 30)}
           
           {/* Coming Soon */}
-          <View style={styles.comingSoonContainer}>
+          <View style={levelsScreenStyles.comingSoonContainer}>
             <Clock size={32} color="#64748B" />
-            <Text style={styles.comingSoonTitle}>More Worlds Coming Soon!</Text>
-            <Text style={styles.comingSoonText}>
+            <Text style={levelsScreenStyles.comingSoonTitle}>More Worlds Coming Soon!</Text>
+            <Text style={levelsScreenStyles.comingSoonText}>
               Complete all levels to unlock new challenges
             </Text>
           </View>
@@ -167,162 +168,3 @@ export default function LevelsScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0F1117',
-  },
-  gradient: {
-    flex: 1,
-  },
-  header: {
-    paddingTop: 60,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backButton: {
-    backgroundColor: 'rgba(26, 29, 41, 0.8)',
-    borderRadius: 12,
-    padding: 12,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    fontFamily: 'System',
-  },
-  headerSpacer: {
-    width: 48,
-  },
-  progressCard: {
-    marginHorizontal: 16,
-    marginBottom: 24,
-    backgroundColor: 'rgba(26, 29, 41, 0.8)',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#2D3748',
-  },
-  progressStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  progressStat: {
-    alignItems: 'center',
-  },
-  progressStatValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginTop: 4,
-  },
-  progressStatLabel: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginTop: 2,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  worldContainer: {
-    marginBottom: 32,
-  },
-  worldHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  worldTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    fontFamily: 'System',
-  },
-  worldProgress: {
-    backgroundColor: 'rgba(24, 255, 146, 0.1)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: '#18FF92',
-  },
-  worldProgressText: {
-    fontSize: 12,
-    color: '#18FF92',
-    fontWeight: '600',
-  },
-  levelsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 16,
-  },
-  levelButton: {
-    margin: 4,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-  },
-  currentLevel: {
-    backgroundColor: 'rgba(255, 227, 71, 0.2)',
-    borderColor: '#FFE347',
-  },
-  completedLevel: {
-    backgroundColor: 'rgba(24, 255, 146, 0.2)',
-    borderColor: '#18FF92',
-  },
-  unlockedLevel: {
-    backgroundColor: 'rgba(0, 224, 255, 0.2)',
-    borderColor: '#00E0FF',
-  },
-  lockedLevel: {
-    backgroundColor: 'rgba(26, 29, 41, 0.5)',
-    borderColor: '#2D3748',
-  },
-  levelNumber: {
-    fontSize: 16,
-    fontWeight: '700',
-    fontFamily: 'System',
-  },
-  starsContainer: {
-    flexDirection: 'row',
-    marginTop: 4,
-    gap: 2,
-  },
-  currentIndicator: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-  },
-  currentDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FFE347',
-  },
-  comingSoonContainer: {
-    alignItems: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 16,
-  },
-  comingSoonTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#64748B',
-    marginTop: 16,
-    fontFamily: 'System',
-  },
-  comingSoonText: {
-    fontSize: 14,
-    color: '#64748B',
-    textAlign: 'center',
-    marginTop: 8,
-  },
-});

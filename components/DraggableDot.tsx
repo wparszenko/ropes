@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { StyleSheet, Platform, View, PanResponder } from 'react-native';
+import { Platform, View, PanResponder } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   withSpring,
@@ -10,6 +10,7 @@ import {
   Gesture,
   GestureDetector,
 } from 'react-native-gesture-handler';
+import { draggableDotStyles } from '@/styles/draggableDotStyles';
 
 interface DraggableDotProps {
   position: {
@@ -137,7 +138,7 @@ export default function DraggableDot({
     return (
       <Animated.View 
         style={[
-          styles.dot, 
+          draggableDotStyles.dot, 
           { backgroundColor: color },
           animatedStyle
         ]}
@@ -151,7 +152,7 @@ export default function DraggableDot({
     <GestureDetector gesture={panGesture}>
       <Animated.View 
         style={[
-          styles.dot, 
+          draggableDotStyles.dot, 
           { backgroundColor: color },
           animatedStyle
         ]} 
@@ -159,32 +160,3 @@ export default function DraggableDot({
     </GestureDetector>
   );
 }
-
-const styles = StyleSheet.create({
-  dot: {
-    position: 'absolute',
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    cursor: Platform.OS === 'web' ? 'grab' : 'default',
-    // Platform-specific shadows
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 5,
-      },
-      web: {
-        boxShadow: '0px 3px 8px rgba(0, 0, 0, 0.3)',
-        userSelect: 'none',
-      },
-    }),
-    zIndex: 10,
-  },
-});

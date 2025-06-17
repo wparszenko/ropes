@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Dimensions, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, RotateCcw, Lightbulb, Chrome as Home, Clock } from 'lucide-react-native';
@@ -12,6 +12,50 @@ import { gameScreenStyles } from '@/styles/gameScreenStyles';
 
 const { width, height } = Dimensions.get('window');
 
+// Timer class for better instance management
+class GameTimer {
+  private intervalId: NodeJS.Timeout | null = null;
+  private isRunning: boolean = false;
+  private onTick: () => void;
+  private onComplete: () => void;
+
+  constructor(onTick: () => void, onComplete: () => void) {
+    this.onTick = onTick;
+    this.onComplete = onComplete;
+  }
+
+  start() {
+    if (this.isRunning) {
+      this.stop(); // Stop existing timer first
+    }
+    
+    this.isRunning = true;
+    this.intervalId = setInterval(() => {
+      if (this.isRunning) {
+        this.onTick();
+      }
+    }, 1000);
+  }
+
+  stop() {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+    this.isRunning = false;
+  }
+
+  destroy() {
+    this.stop();
+    this.onTick = () => {};
+    this.onComplete = () => {};
+  }
+
+  getIsRunning() {
+    return this.isRunning;
+  }
+}
+
 export default function GameScreen() {
   const {
     currentLevel,
@@ -23,6 +67,7 @@ export default function GameScreen() {
     setTimeRemaining,
     decrementTime,
     completeLevel,
+    failLevel,
   } = useGameStore();
 
   const { resetLevel: resetRopeLevel, ropes, intersectionCount } = useRopeStore();
@@ -35,55 +80,71 @@ export default function GameScreen() {
   
   // Add ref to track if modal has been shown for current level
   const modalShownForLevel = useRef<number | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const gameStateRef = useRef(gameState);
   const modalClosingRef = useRef(false);
+  const gameTimerRef = useRef<GameTimer | null>(null);
+  const gameStateRef = useRef(gameState);
 
   // Update gameState ref when it changes
   useEffect(() => {
     gameStateRef.current = gameState;
   }, [gameState]);
 
+  // Timer tick handler
+  const handleTimerTick = useCallback(() => {
+    // Check if game is still playing before decrementing
+    if (gameStateRef.current === 'playing') {
+      decrementTime();
+    } else {
+      // Stop timer if game state changed
+      gameTimerRef.current?.stop();
+    }
+  }, [decrementTime]);
+
+  // Timer complete handler (when time reaches 0)
+  const handleTimerComplete = useCallback(() => {
+    if (gameStateRef.current === 'playing') {
+      failLevel();
+    }
+  }, [failLevel]);
+
+  // Initialize timer instance
+  useEffect(() => {
+    // Create timer instance
+    gameTimerRef.current = new GameTimer(handleTimerTick, handleTimerComplete);
+
+    // Cleanup on unmount
+    return () => {
+      gameTimerRef.current?.destroy();
+      gameTimerRef.current = null;
+    };
+  }, [handleTimerTick, handleTimerComplete]);
+
+  // Start/stop timer based on game state
+  useEffect(() => {
+    const timer = gameTimerRef.current;
+    if (!timer) return;
+
+    if (gameState === 'playing') {
+      // Start timer when playing
+      timer.start();
+    } else {
+      // Stop timer when not playing (completed, failed, paused)
+      timer.stop();
+    }
+  }, [gameState]);
+
+  // Handle time reaching zero
+  useEffect(() => {
+    if (timeRemaining <= 0 && gameState === 'playing') {
+      gameTimerRef.current?.stop();
+      failLevel();
+    }
+  }, [timeRemaining, gameState, failLevel]);
+
   useEffect(() => {
     const data = getCurrentLevelData();
     setLevelData(data);
   }, [currentLevel]);
-
-  // Enhanced timer effect - starts/stops based on game state
-  useEffect(() => {
-    // Clear any existing timer first
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-
-    // Only start timer if game is actively playing
-    if (gameState === 'playing') {
-      timerRef.current = setInterval(() => {
-        // Check current game state before decrementing
-        const currentGameState = gameStateRef.current;
-        
-        // Only decrement if still playing
-        if (currentGameState === 'playing') {
-          decrementTime();
-        } else {
-          // Stop timer if game state changed
-          if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
-          }
-        }
-      }, 1000);
-    }
-
-    // Cleanup timer when game state changes or component unmounts
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    };
-  }, [gameState, decrementTime]);
 
   // Handle level completion with new star system
   useEffect(() => {
@@ -94,10 +155,7 @@ export default function GameScreen() {
       modalShownForLevel.current !== currentLevel
     ) {
       // Stop timer immediately on completion
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
+      gameTimerRef.current?.stop();
 
       const timeElapsed = 30 - timeRemaining;
       setCompletionTime(timeElapsed);
@@ -134,10 +192,7 @@ export default function GameScreen() {
       modalShownForLevel.current !== currentLevel
     ) {
       // Stop timer immediately on failure
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
+      gameTimerRef.current?.stop();
 
       setShowFailedModal(true);
       modalShownForLevel.current = currentLevel;
@@ -151,39 +206,17 @@ export default function GameScreen() {
     setShowFailedModal(false);
     modalClosingRef.current = false;
     setTimeRemaining(30); // Reset timer for new level
-    
-    // Clear any existing timer when level changes
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
   }, [currentLevel, setTimeRemaining]);
 
-  // Cleanup timer on component unmount
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    };
-  }, []);
-
   const handleBack = () => {
-    // Stop timer when leaving game
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
+    // Stop and destroy timer when leaving game
+    gameTimerRef.current?.stop();
     router.back();
   };
 
   const handleReset = () => {
     // Stop timer during reset
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
+    gameTimerRef.current?.stop();
 
     modalClosingRef.current = true;
     setShowCompleteModal(false);
@@ -209,11 +242,8 @@ export default function GameScreen() {
   };
 
   const handleHome = () => {
-    // Stop timer when going home
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
+    // Stop and destroy timer when going home
+    gameTimerRef.current?.stop();
     router.push('/');
   };
 

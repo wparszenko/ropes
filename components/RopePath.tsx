@@ -34,8 +34,8 @@ export default function RopePath({ startPoint, endPoint, color }: RopePathProps)
     const midX = (startX + endX) / 2;
     const midY = (startY + endY) / 2;
     
-    // Dynamic arc height based on distance (more realistic cable physics)
-    const arcHeight = Math.min(distance * 0.25, 100);
+    // Dynamic arc height based on distance (more realistic rope physics)
+    const arcHeight = Math.min(distance * 0.25, 80);
     const controlX = midX;
     const controlY = midY + arcHeight; // Downward arc for gravity effect
 
@@ -51,12 +51,11 @@ export default function RopePath({ startPoint, endPoint, color }: RopePathProps)
     <AnimatedPath
       animatedProps={animatedProps}
       stroke={color}
-      strokeWidth={6}
+      strokeWidth={8}
       fill="none"
       strokeLinecap="round"
       strokeLinejoin="round"
-      // Ensure path is always rendered and visible
-      opacity={1}
+      opacity={0.9}
       pointerEvents="none"
     />
   );

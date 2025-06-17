@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Star, ArrowRight, Chrome as Home, RotateCcw } from 'lucide-react-native';
 
@@ -25,23 +25,23 @@ export default function LevelCompleteModal({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View className="flex-1 bg-black/80 justify-center items-center px-6">
+      <View style={styles.overlay}>
         <LinearGradient
           colors={['#1A1D29', '#0F1117']}
-          className="bg-dark-surface rounded-3xl p-8 w-full max-w-sm border-2 border-neon-green/30"
+          style={styles.modal}
         >
           {/* Success Header */}
-          <View className="items-center mb-6">
-            <Text className="text-neon-green text-3xl font-bold font-orbitron mb-2">
-              LEVEL COMPLETE!
+          <View style={styles.header}>
+            <Text style={styles.title}>
+              ROPES UNTANGLED!
             </Text>
-            <Text className="text-white text-lg">
-              Level {level}
+            <Text style={styles.subtitle}>
+              Level {level} Complete
             </Text>
           </View>
 
           {/* Stars */}
-          <View className="flex-row justify-center mb-8 space-x-2">
+          <View style={styles.starsContainer}>
             {[1, 2, 3].map((star) => (
               <Star
                 key={star}
@@ -53,49 +53,49 @@ export default function LevelCompleteModal({
           </View>
 
           {/* Performance Stats */}
-          <View className="bg-dark-bg/50 rounded-2xl p-4 mb-6">
-            <Text className="text-white text-center font-bold mb-2">
+          <View style={styles.statsContainer}>
+            <Text style={styles.statsTitle}>
               Performance
             </Text>
-            <View className="flex-row justify-between">
-              <Text className="text-gray-400">Time:</Text>
-              <Text className="text-neon-blue">1:23</Text>
+            <View style={styles.statRow}>
+              <Text style={styles.statLabel}>Time:</Text>
+              <Text style={styles.statValue}>1:23</Text>
             </View>
-            <View className="flex-row justify-between">
-              <Text className="text-gray-400">Moves:</Text>
-              <Text className="text-neon-green">12</Text>
+            <View style={styles.statRow}>
+              <Text style={styles.statLabel}>Moves:</Text>
+              <Text style={styles.statValue}>12</Text>
             </View>
           </View>
 
           {/* Action Buttons */}
-          <View className="space-y-3">
+          <View style={styles.buttonContainer}>
             <TouchableOpacity
               onPress={onNextLevel}
-              className="bg-neon-green/20 border-2 border-neon-green rounded-2xl p-4 flex-row items-center justify-center"
+              style={[styles.button, styles.nextButton]}
             >
-              <Text className="text-white text-lg font-bold mr-2 font-orbitron">
+              <Text style={styles.nextButtonText}>
                 NEXT LEVEL
               </Text>
               <ArrowRight size={24} color="#18FF92" />
             </TouchableOpacity>
 
-            <View className="flex-row space-x-3">
+            <View style={styles.secondaryButtons}>
               <TouchableOpacity
                 onPress={onClose}
-                className="flex-1 bg-dark-surface/80 border border-dark-border rounded-2xl p-3 flex-row items-center justify-center"
+                style={[styles.button, styles.secondaryButton]}
               >
                 <RotateCcw size={20} color="#64748B" />
-                <Text className="text-gray-300 font-bold ml-2">
+                <Text style={styles.secondaryButtonText}>
                   RETRY
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={onClose}
-                className="flex-1 bg-dark-surface/80 border border-dark-border rounded-2xl p-3 flex-row items-center justify-center"
+                style={[styles.button, styles.secondaryButton]}
               >
                 <Home size={20} color="#64748B" />
-                <Text className="text-gray-300 font-bold ml-2">
+                <Text style={styles.secondaryButtonText}>
                   HOME
                 </Text>
               </TouchableOpacity>
@@ -106,3 +106,107 @@ export default function LevelCompleteModal({
     </Modal>
   );
 }
+
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  modal: {
+    backgroundColor: '#1A1D29',
+    borderRadius: 24,
+    padding: 32,
+    width: '100%',
+    maxWidth: 400,
+    borderWidth: 2,
+    borderColor: 'rgba(24, 255, 146, 0.3)',
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  title: {
+    color: '#18FF92',
+    fontSize: 28,
+    fontWeight: '700',
+    marginBottom: 8,
+    fontFamily: 'System',
+  },
+  subtitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 32,
+    gap: 8,
+  },
+  statsContainer: {
+    backgroundColor: 'rgba(15, 17, 23, 0.5)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+  },
+  statsTitle: {
+    color: '#FFFFFF',
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 8,
+    fontSize: 16,
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 2,
+  },
+  statLabel: {
+    color: '#9CA3AF',
+    fontSize: 14,
+  },
+  statValue: {
+    color: '#00E0FF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  buttonContainer: {
+    gap: 12,
+  },
+  button: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 2,
+  },
+  nextButton: {
+    backgroundColor: 'rgba(24, 255, 146, 0.2)',
+    borderColor: '#18FF92',
+  },
+  nextButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+    marginRight: 8,
+    fontFamily: 'System',
+  },
+  secondaryButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  secondaryButton: {
+    flex: 1,
+    backgroundColor: 'rgba(26, 29, 41, 0.8)',
+    borderColor: '#2D3748',
+  },
+  secondaryButtonText: {
+    color: '#9CA3AF',
+    fontWeight: '600',
+    marginLeft: 8,
+    fontSize: 14,
+  },
+});

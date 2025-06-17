@@ -63,7 +63,7 @@ export default function GameScreen() {
   const handleHint = () => {
     Alert.alert(
       'Hint',
-      'Tap on the wires to connect them to their matching colored sockets. Connect all wires to activate the portal and help the robot escape!',
+      'Drag the colored dots to untangle the ropes! Move them so that no ropes cross each other. When all ropes are untangled, the portal will activate and the robot can escape!',
       [{ text: 'Got it!' }]
     );
   };
@@ -117,7 +117,7 @@ export default function GameScreen() {
           <View style={styles.headerCenter}>
             <Text style={styles.levelTitle}>LEVEL {currentLevel}</Text>
             <Text style={styles.levelSubtitle}>
-              {levelData.goals.connectAll ? 'Connect All Circuits' : 'Survive'}
+              Untangle the Ropes
             </Text>
           </View>
 
@@ -133,8 +133,8 @@ export default function GameScreen() {
             <Text style={styles.statValue}>{formatTime(gameTime)}</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Moves</Text>
-            <Text style={styles.statValue}>{moves}</Text>
+            <Text style={styles.statLabel}>Ropes</Text>
+            <Text style={styles.statValue}>{levelData.wires.length}</Text>
           </View>
           <View style={styles.statItem}>
             <Text style={styles.statLabel}>Difficulty</Text>

@@ -9,13 +9,15 @@ import {
   Gesture,
   GestureDetector,
 } from 'react-native-gesture-handler';
-import { BOUNDS } from '@/app/(tabs)/index';
+import { BOUNDS } from '@/components/GameBoard';
 
 interface DraggableDotProps {
   position: {
     x: Animated.SharedValue<number>;
     y: Animated.SharedValue<number>;
   };
+  color?: string;
+  onPositionChange?: () => void;
 }
 
 // Clamp function to constrain values within bounds
@@ -24,7 +26,7 @@ const clamp = (value: number, min: number, max: number) => {
   return Math.min(Math.max(value, min), max);
 };
 
-export default function DraggableDot({ position }: DraggableDotProps) {
+export default function DraggableDot({ position, color = '#2ECC71', onPositionChange }: DraggableDotProps) {
   // Store initial position for gesture
   const startPosition = { x: 0, y: 0 };
 
@@ -62,6 +64,11 @@ export default function DraggableDot({ position }: DraggableDotProps) {
         damping: 15,
         stiffness: 150,
       });
+      
+      // Trigger intersection check
+      if (onPositionChange) {
+        runOnJS(onPositionChange)();
+      }
     });
 
   const animatedStyle = useAnimatedStyle(() => {
@@ -75,7 +82,13 @@ export default function DraggableDot({ position }: DraggableDotProps) {
 
   return (
     <GestureDetector gesture={panGesture}>
-      <Animated.View style={[styles.dot, animatedStyle]} />
+      <Animated.View 
+        style={[
+          styles.dot, 
+          { backgroundColor: color },
+          animatedStyle
+        ]} 
+      />
     </GestureDetector>
   );
 }
@@ -86,7 +99,8 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#2ECC71',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
     // Platform-specific shadows
     ...Platform.select({
       ios: {

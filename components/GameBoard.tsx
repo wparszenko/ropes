@@ -1,13 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { View, Dimensions, StyleSheet } from 'react-native';
+import React, { useEffect, useState, useMemo } from 'react';
+import { View, Dimensions, StyleSheet, TouchableOpacity } from 'react-native';
 import { Svg, Line, Circle, Rect, Path } from 'react-native-svg';
-import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
-import Animated, { 
-  useAnimatedGestureHandler, 
-  useAnimatedStyle, 
+import { GestureHandlerRootView, PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
+import Animated, {
+  useAnimatedGestureHandler,
+  useAnimatedStyle,
   useSharedValue,
   runOnJS,
-  withSpring
+  withSpring,
 } from 'react-native-reanimated';
 import { LevelData } from '@/data/levels';
 import { useGameStore } from '@/store/gameStore';
@@ -15,53 +15,62 @@ import { useGameStore } from '@/store/gameStore';
 const { width, height } = Dimensions.get('window');
 const BOARD_HEIGHT = height - 300; // Account for header and controls
 const BOARD_WIDTH = width - 32;
+const SNAP_DISTANCE = 30;
 
 interface GameBoardProps {
   levelData: LevelData;
 }
 
-interface DraggableWirePoint {
-  wireId: string;
-  pointType: 'start' | 'end';
-  x: number;
-  y: number;
+interface WirePosition {
+  start: [number, number];
+  end: [number, number];
 }
 
 export default function GameBoard({ levelData }: GameBoardProps) {
+  // Always call hooks in the same order, regardless of levelData
   const { wireConnections, updateWireConnection, activatePortal, completeLevel } = useGameStore();
   const [allConnected, setAllConnected] = useState(false);
-  const [wirePositions, setWirePositions] = useState<{ [key: string]: { start: [number, number], end: [number, number] } }>({});
-  const [draggedPoint, setDraggedPoint] = useState<DraggableWirePoint | null>(null);
+  const [wirePositions, setWirePositions] = useState<{ [key: string]: WirePosition }>({});
 
-  // Initialize wire positions from level data
-  useEffect(() => {
-    const initialPositions: { [key: string]: { start: [number, number], end: [number, number] } } = {};
+  // Initialize wire positions from levelData
+  const initialWirePositions = useMemo(() => {
+    if (!levelData || !levelData.wires) return {};
+    
+    const positions: { [key: string]: WirePosition } = {};
     levelData.wires.forEach(wire => {
-      initialPositions[wire.id] = {
-        start: wire.start,
-        end: wire.end
+      positions[wire.id] = {
+        start: [...wire.start] as [number, number],
+        end: [...wire.end] as [number, number],
       };
     });
-    setWirePositions(initialPositions);
+    return positions;
   }, [levelData]);
 
+  // Update wire positions when levelData changes
   useEffect(() => {
-    // Check if all wires are connected to their matching sockets
+    setWirePositions(initialWirePositions);
+  }, [initialWirePositions]);
+
+  // Check connections
+  useEffect(() => {
+    if (!levelData || !levelData.wires || !levelData.sockets) return;
+
     const connected = levelData.wires.every(wire => {
       const wirePos = wirePositions[wire.id];
       if (!wirePos) return false;
-      
-      // Check if wire end is close to any matching socket
+
       return levelData.sockets.some(socket => {
         if (socket.color !== wire.color) return false;
+        
         const distance = Math.sqrt(
-          Math.pow(wirePos.end[0] - socket.position[0], 2) + 
+          Math.pow(wirePos.end[0] - socket.position[0], 2) +
           Math.pow(wirePos.end[1] - socket.position[1], 2)
         );
-        return distance < 25; // Connection threshold
+        
+        return distance < SNAP_DISTANCE;
       });
     });
-    
+
     setAllConnected(connected);
     
     if (connected && levelData.goals.connectAll) {
@@ -70,77 +79,63 @@ export default function GameBoard({ levelData }: GameBoardProps) {
         completeLevel(3);
       }, 1000);
     }
-  }, [wirePositions, levelData]);
+  }, [wirePositions, levelData, activatePortal, completeLevel]);
 
-  const updateWirePosition = (wireId: string, pointType: 'start' | 'end', newX: number, newY: number) => {
-    setWirePositions(prev => ({
-      ...prev,
-      [wireId]: {
-        ...prev[wireId],
-        [pointType]: [newX, newY]
-      }
-    }));
-  };
-
-  const checkCollisionWithObstacles = (x: number, y: number): boolean => {
-    return levelData.obstacles.some(obstacle => {
-      const left = obstacle.position[0] - obstacle.size[0] / 2;
-      const right = obstacle.position[0] + obstacle.size[0] / 2;
-      const top = obstacle.position[1] - obstacle.size[1] / 2;
-      const bottom = obstacle.position[1] + obstacle.size[1] / 2;
-      
-      return x >= left && x <= right && y >= top && y <= bottom;
-    });
-  };
-
-  const snapToSocket = (x: number, y: number, wireColor: string): [number, number] => {
-    const matchingSocket = levelData.sockets.find(socket => {
-      if (socket.color !== wireColor) return false;
-      const distance = Math.sqrt(
-        Math.pow(x - socket.position[0], 2) + 
-        Math.pow(y - socket.position[1], 2)
-      );
-      return distance < 40; // Snap threshold
-    });
-    
-    return matchingSocket ? matchingSocket.position : [x, y];
-  };
-
-  const createPanGestureHandler = (wireId: string, pointType: 'start' | 'end', wireColor: string) => {
+  const createDraggableWirePoint = (wireId: string, isStart: boolean) => {
     const translateX = useSharedValue(0);
     const translateY = useSharedValue(0);
 
-    const gestureHandler = useAnimatedGestureHandler({
-      onStart: (_, context) => {
-        const currentPos = wirePositions[wireId]?.[pointType] || [0, 0];
-        context.startX = currentPos[0];
-        context.startY = currentPos[1];
-        runOnJS(setDraggedPoint)({ wireId, pointType, x: currentPos[0], y: currentPos[1] });
+    const gestureHandler = useAnimatedGestureHandler<PanGestureHandlerGestureEvent>({
+      onStart: () => {
+        // Reset translation values
+        translateX.value = 0;
+        translateY.value = 0;
       },
-      onActive: (event, context) => {
+      onActive: (event) => {
         translateX.value = event.translationX;
         translateY.value = event.translationY;
-        
-        const newX = Math.max(20, Math.min(BOARD_WIDTH - 20, context.startX + event.translationX));
-        const newY = Math.max(20, Math.min(BOARD_HEIGHT - 20, context.startY + event.translationY));
-        
-        // Check for obstacle collision
-        if (!runOnJS(checkCollisionWithObstacles)(newX, newY)) {
-          runOnJS(updateWirePosition)(wireId, pointType, newX, newY);
-        }
       },
-      onEnd: (event, context) => {
-        const finalX = Math.max(20, Math.min(BOARD_WIDTH - 20, context.startX + event.translationX));
-        const finalY = Math.max(20, Math.min(BOARD_HEIGHT - 20, context.startY + event.translationY));
-        
-        // Snap to socket if close enough
-        const [snappedX, snappedY] = runOnJS(snapToSocket)(finalX, finalY, wireColor);
-        runOnJS(updateWirePosition)(wireId, pointType, snappedX, snappedY);
-        
-        // Reset animation values
+      onEnd: () => {
+        const currentWirePos = wirePositions[wireId];
+        if (!currentWirePos) return;
+
+        const pointToUpdate = isStart ? currentWirePos.start : currentWirePos.end;
+        const newX = Math.max(20, Math.min(BOARD_WIDTH - 20, pointToUpdate[0] + translateX.value));
+        const newY = Math.max(20, Math.min(BOARD_HEIGHT - 20, pointToUpdate[1] + translateY.value));
+
+        // Check for socket snapping
+        let snappedToSocket = false;
+        if (!isStart && levelData && levelData.sockets) {
+          const wire = levelData.wires.find(w => w.id === wireId);
+          if (wire) {
+            for (const socket of levelData.sockets) {
+              if (socket.color === wire.color) {
+                const distance = Math.sqrt(
+                  Math.pow(newX - socket.position[0], 2) +
+                  Math.pow(newY - socket.position[1], 2)
+                );
+                
+                if (distance < SNAP_DISTANCE) {
+                  runOnJS(updateWirePosition)(wireId, isStart, socket.position[0], socket.position[1]);
+                  runOnJS(updateWireConnection)(wireId, true);
+                  snappedToSocket = true;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        if (!snappedToSocket) {
+          runOnJS(updateWirePosition)(wireId, isStart, newX, newY);
+          if (!isStart) {
+            runOnJS(updateWireConnection)(wireId, false);
+          }
+        }
+
+        // Reset translation with spring animation
         translateX.value = withSpring(0);
         translateY.value = withSpring(0);
-        runOnJS(setDraggedPoint)(null);
       },
     });
 
@@ -156,124 +151,62 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     return { gestureHandler, animatedStyle };
   };
 
-  const renderWire = (wire: any) => {
-    const wirePos = wirePositions[wire.id];
-    if (!wirePos) return null;
+  const updateWirePosition = (wireId: string, isStart: boolean, x: number, y: number) => {
+    setWirePositions(prev => {
+      const current = prev[wireId];
+      if (!current) return prev;
 
-    const startX = wirePos.start[0];
-    const startY = wirePos.start[1];
-    const endX = wirePos.end[0];
-    const endY = wirePos.end[1];
-
-    // Check if wire is connected to correct socket
-    const isConnected = levelData.sockets.some(socket => {
-      if (socket.color !== wire.color) return false;
-      const distance = Math.sqrt(
-        Math.pow(endX - socket.position[0], 2) + 
-        Math.pow(endY - socket.position[1], 2)
-      );
-      return distance < 25;
+      return {
+        ...prev,
+        [wireId]: {
+          ...current,
+          [isStart ? 'start' : 'end']: [x, y] as [number, number],
+        },
+      };
     });
+  };
 
-    // Create curved path for the wire
-    const midX = (startX + endX) / 2;
-    const midY = (startY + endY) / 2;
-    const distance = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+  const isPointInObstacle = (x: number, y: number) => {
+    if (!levelData || !levelData.obstacles) return false;
+    
+    return levelData.obstacles.some(obstacle => {
+      const left = obstacle.position[0] - obstacle.size[0] / 2;
+      const right = obstacle.position[0] + obstacle.size[0] / 2;
+      const top = obstacle.position[1] - obstacle.size[1] / 2;
+      const bottom = obstacle.position[1] + obstacle.size[1] / 2;
+      
+      return x >= left && x <= right && y >= top && y <= bottom;
+    });
+  };
+
+  const createCurvedPath = (start: [number, number], end: [number, number]) => {
+    const [x1, y1] = start;
+    const [x2, y2] = end;
+    
+    const midX = (x1 + x2) / 2;
+    const midY = (y1 + y2) / 2;
+    
+    const distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
     const curvature = Math.min(distance * 0.2, 50);
     
-    const pathData = `M ${startX} ${startY} Q ${midX} ${midY - curvature} ${endX} ${endY}`;
-
-    const startGesture = createPanGestureHandler(wire.id, 'start', wire.color);
-    const endGesture = createPanGestureHandler(wire.id, 'end', wire.color);
-
-    return (
-      <React.Fragment key={wire.id}>
-        {/* Wire path */}
-        <Path
-          d={pathData}
-          stroke={wire.color}
-          strokeWidth={isConnected ? 8 : 6}
-          strokeLinecap="round"
-          fill="none"
-          opacity={isConnected ? 1 : 0.7}
-        />
-        
-        {/* Start point - draggable */}
-        <PanGestureHandler onGestureEvent={startGesture.gestureHandler}>
-          <Animated.View
-            style={[
-              {
-                position: 'absolute',
-                left: startX - 15,
-                top: startY - 15,
-                width: 30,
-                height: 30,
-                zIndex: 10,
-              },
-              startGesture.animatedStyle
-            ]}
-          >
-            <Svg width={30} height={30}>
-              <Circle
-                cx={15}
-                cy={15}
-                r={12}
-                fill={wire.color}
-                stroke="#FFFFFF"
-                strokeWidth={3}
-                opacity={0.9}
-              />
-              <Circle
-                cx={15}
-                cy={15}
-                r={6}
-                fill="#FFFFFF"
-                opacity={0.8}
-              />
-            </Svg>
-          </Animated.View>
-        </PanGestureHandler>
-        
-        {/* End point - draggable */}
-        <PanGestureHandler onGestureEvent={endGesture.gestureHandler}>
-          <Animated.View
-            style={[
-              {
-                position: 'absolute',
-                left: endX - 15,
-                top: endY - 15,
-                width: 30,
-                height: 30,
-                zIndex: 10,
-              },
-              endGesture.animatedStyle
-            ]}
-          >
-            <Svg width={30} height={30}>
-              <Circle
-                cx={15}
-                cy={15}
-                r={12}
-                fill={isConnected ? wire.color : 'transparent'}
-                stroke={wire.color}
-                strokeWidth={3}
-                opacity={isConnected ? 1 : 0.7}
-              />
-              {isConnected && (
-                <Circle
-                  cx={15}
-                  cy={15}
-                  r={6}
-                  fill="#FFFFFF"
-                  opacity={0.9}
-                />
-              )}
-            </Svg>
-          </Animated.View>
-        </PanGestureHandler>
-      </React.Fragment>
-    );
+    const controlX = midX;
+    const controlY = midY - curvature;
+    
+    return `M ${x1} ${y1} Q ${controlX} ${controlY} ${x2} ${y2}`;
   };
+
+  // Early return if no levelData
+  if (!levelData || !levelData.wires || !levelData.sockets) {
+    return (
+      <GestureHandlerRootView style={styles.container}>
+        <View style={styles.gameBoard}>
+          <View style={styles.loadingContainer}>
+            {/* Empty loading state */}
+          </View>
+        </View>
+      </GestureHandlerRootView>
+    );
+  }
 
   return (
     <GestureHandlerRootView style={styles.container}>
@@ -294,22 +227,43 @@ export default function GameBoard({ levelData }: GameBoardProps) {
             />
           ))}
 
+          {/* Render wires */}
+          {levelData.wires.map((wire) => {
+            const wirePos = wirePositions[wire.id];
+            if (!wirePos) return null;
+
+            const isConnected = wireConnections[wire.id] || false;
+            const pathData = createCurvedPath(wirePos.start, wirePos.end);
+
+            return (
+              <Path
+                key={wire.id}
+                d={pathData}
+                stroke={wire.color}
+                strokeWidth={isConnected ? 8 : 6}
+                strokeLinecap="round"
+                fill="none"
+                opacity={isConnected ? 1 : 0.7}
+              />
+            );
+          })}
+
           {/* Render sockets */}
           {levelData.sockets.map((socket) => {
-            // Check if any wire is connected to this socket
-            const isConnected = levelData.wires.some(wire => {
+            const connectedWire = levelData.wires.find(wire => {
               const wirePos = wirePositions[wire.id];
               if (!wirePos || wire.color !== socket.color) return false;
+              
               const distance = Math.sqrt(
-                Math.pow(wirePos.end[0] - socket.position[0], 2) + 
+                Math.pow(wirePos.end[0] - socket.position[0], 2) +
                 Math.pow(wirePos.end[1] - socket.position[1], 2)
               );
-              return distance < 25;
+              
+              return distance < SNAP_DISTANCE;
             });
             
             return (
               <React.Fragment key={socket.id}>
-                {/* Socket outer ring */}
                 <Circle
                   cx={socket.position[0]}
                   cy={socket.position[1]}
@@ -320,19 +274,17 @@ export default function GameBoard({ levelData }: GameBoardProps) {
                   opacity={0.8}
                 />
                 
-                {/* Socket inner circle */}
                 <Circle
                   cx={socket.position[0]}
                   cy={socket.position[1]}
                   r={12}
-                  fill={isConnected ? socket.color : 'transparent'}
+                  fill={connectedWire ? socket.color : 'transparent'}
                   stroke={socket.color}
                   strokeWidth={2}
-                  opacity={isConnected ? 1 : 0.6}
+                  opacity={connectedWire ? 1 : 0.6}
                 />
                 
-                {/* Connection indicator */}
-                {isConnected && (
+                {connectedWire && (
                   <Circle
                     cx={socket.position[0]}
                     cy={socket.position[1]}
@@ -346,9 +298,8 @@ export default function GameBoard({ levelData }: GameBoardProps) {
           })}
 
           {/* Portal (when all connected) */}
-          {allConnected && (
+          {allConnected && levelData.portalPosition && (
             <React.Fragment>
-              {/* Portal outer glow */}
               <Circle
                 cx={levelData.portalPosition[0]}
                 cy={levelData.portalPosition[1]}
@@ -359,7 +310,6 @@ export default function GameBoard({ levelData }: GameBoardProps) {
                 opacity={0.8}
               />
               
-              {/* Portal inner circle */}
               <Circle
                 cx={levelData.portalPosition[0]}
                 cy={levelData.portalPosition[1]}
@@ -369,7 +319,6 @@ export default function GameBoard({ levelData }: GameBoardProps) {
                 strokeWidth={2}
               />
               
-              {/* Portal center */}
               <Circle
                 cx={levelData.portalPosition[0]}
                 cy={levelData.portalPosition[1]}
@@ -381,27 +330,72 @@ export default function GameBoard({ levelData }: GameBoardProps) {
           )}
         </Svg>
 
-        {/* Render draggable wires */}
-        {levelData.wires.map(wire => renderWire(wire))}
+        {/* Draggable Wire Points */}
+        {levelData.wires.map((wire) => {
+          const wirePos = wirePositions[wire.id];
+          if (!wirePos) return null;
+
+          const startDraggable = createDraggableWirePoint(wire.id, true);
+          const endDraggable = createDraggableWirePoint(wire.id, false);
+
+          return (
+            <React.Fragment key={`draggable-${wire.id}`}>
+              {/* Start Point */}
+              <PanGestureHandler onGestureEvent={startDraggable.gestureHandler}>
+                <Animated.View
+                  style={[
+                    styles.draggablePoint,
+                    {
+                      left: wirePos.start[0] - 12,
+                      top: wirePos.start[1] - 12,
+                      backgroundColor: wire.color,
+                      borderColor: '#FFFFFF',
+                    },
+                    startDraggable.animatedStyle,
+                  ]}
+                />
+              </PanGestureHandler>
+
+              {/* End Point */}
+              <PanGestureHandler onGestureEvent={endDraggable.gestureHandler}>
+                <Animated.View
+                  style={[
+                    styles.draggablePoint,
+                    {
+                      left: wirePos.end[0] - 12,
+                      top: wirePos.end[1] - 12,
+                      backgroundColor: wireConnections[wire.id] ? wire.color : 'transparent',
+                      borderColor: wire.color,
+                      borderWidth: wireConnections[wire.id] ? 2 : 3,
+                    },
+                    endDraggable.animatedStyle,
+                  ]}
+                />
+              </PanGestureHandler>
+            </React.Fragment>
+          );
+        })}
 
         {/* Robot */}
-        <View
-          style={[
-            styles.robot,
-            {
-              left: levelData.robotStart[0] - 15,
-              top: levelData.robotStart[1] - 15,
-            },
-          ]}
-        >
-          <View style={styles.robotBody}>
-            <View style={styles.robotEyes}>
-              <View style={styles.robotEye} />
-              <View style={styles.robotEye} />
+        {levelData.robotStart && (
+          <View
+            style={[
+              styles.robot,
+              {
+                left: levelData.robotStart[0] - 15,
+                top: levelData.robotStart[1] - 15,
+              },
+            ]}
+          >
+            <View style={styles.robotBody}>
+              <View style={styles.robotEyes}>
+                <View style={styles.robotEye} />
+                <View style={styles.robotEye} />
+              </View>
+              <View style={styles.robotMouth} />
             </View>
-            <View style={styles.robotMouth} />
           </View>
-        </View>
+        )}
       </View>
     </GestureHandlerRootView>
   );
@@ -423,6 +417,19 @@ const styles = StyleSheet.create({
   },
   svg: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  draggablePoint: {
+    position: 'absolute',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    zIndex: 10,
   },
   robot: {
     position: 'absolute',

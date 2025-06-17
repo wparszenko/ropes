@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, Dimensions, Platform } from 'react-native';
+import { View, StyleSheet, Dimensions, Platform, Text } from 'react-native';
 import { Svg } from 'react-native-svg';
 import { useSharedValue } from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -142,8 +142,8 @@ export default function GameBoard({ levelData }: GameBoardProps) {
       {__DEV__ && (
         <View style={styles.debugInfo}>
           <View style={styles.debugText}>
-            <View style={styles.debugLabel}>Intersections: {intersectionCount}</View>
-            <View style={styles.debugLabel}>Ropes: {ropes.length}</View>
+            <Text style={styles.debugLabel}>Intersections: {intersectionCount}</Text>
+            <Text style={styles.debugLabel}>Ropes: {ropes.length}</Text>
           </View>
         </View>
       )}

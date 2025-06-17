@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Clock, RotateCcw, Chrome as Home, AlertTriangle } from 'lucide-react-native';
+import { Clock, RotateCcw, Chrome as Home, TriangleAlert as AlertTriangle } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { levelFailedModalStyles } from '@/styles/levelFailedModalStyles';
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useMemo } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { View, Text, Dimensions, Platform } from 'react-native';
 import { Svg } from 'react-native-svg';
 import { useSharedValue } from 'react-native-reanimated';
@@ -49,34 +49,29 @@ export default function GameBoard({ levelData }: GameBoardProps) {
 
   // Create a fixed number of shared values at the top level
   // This ensures the number of hook calls remains constant
-  const sharedValues = useMemo(() => {
-    const values: { [key: string]: any } = {};
-    for (let i = 0; i < MAX_ROPES; i++) {
-      const ropeId = `rope-${i}`;
-      values[ropeId] = {
-        startX: useSharedValue(0),
-        startY: useSharedValue(0),
-        endX: useSharedValue(0),
-        endY: useSharedValue(0),
-      };
-    }
-    return values;
-  }, []); // Empty dependency array - only create once
+  const sharedValues = [];
+  for (let i = 0; i < MAX_ROPES; i++) {
+    sharedValues.push({
+      startX: useSharedValue(0),
+      startY: useSharedValue(0),
+      endX: useSharedValue(0),
+      endY: useSharedValue(0),
+    });
+  }
 
   // Update shared values when positions change
   useEffect(() => {
     ropes.forEach((rope, index) => {
       const position = ropePositions[rope.id];
-      const sharedKey = `rope-${index}`;
-      const shared = sharedValues[sharedKey];
-      if (position && shared) {
+      const shared = sharedValues[index];
+      if (position && shared && index < MAX_ROPES) {
         shared.startX.value = position.startX;
         shared.startY.value = position.startY;
         shared.endX.value = position.endX;
         shared.endY.value = position.endY;
       }
     });
-  }, [ropePositions, sharedValues, ropes]);
+  }, [ropePositions, ropes]);
 
   // Initialize level when component mounts or level changes
   useEffect(() => {
@@ -119,9 +114,8 @@ export default function GameBoard({ levelData }: GameBoardProps) {
       <View style={gameBoardStyles.svgContainer}>
         <Svg width={BOARD_WIDTH} height={BOARD_HEIGHT} style={gameBoardStyles.svg}>
           {ropes.map((rope, index) => {
-            const sharedKey = `rope-${index}`;
-            const shared = sharedValues[sharedKey];
-            if (!shared) return null;
+            const shared = sharedValues[index];
+            if (!shared || index >= MAX_ROPES) return null;
             
             return (
               <RopePath
@@ -138,9 +132,8 @@ export default function GameBoard({ levelData }: GameBoardProps) {
       {/* Dots Layer - Above SVG */}
       <View style={gameBoardStyles.dotsContainer}>
         {ropes.map((rope, index) => {
-          const sharedKey = `rope-${index}`;
-          const shared = sharedValues[sharedKey];
-          if (!shared) return null;
+          const shared = sharedValues[index];
+          if (!shared || index >= MAX_ROPES) return null;
 
           return (
             <React.Fragment key={rope.id}>

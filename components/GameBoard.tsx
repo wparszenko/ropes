@@ -8,12 +8,21 @@ import RopePath from '@/components/RopePath';
 
 const { width, height } = Dimensions.get('window');
 
-// Game boundaries - constrained to the game board area
-const GAME_BOARD_BOUNDS = {
-  MIN_X: 50,  // 16 (margin) + 34 (padding from border)
-  MAX_X: width - 82,  // width - 16 (margin) - 50 (padding from border) - 16 (dot radius compensation)
-  MIN_Y: 50,  // Top padding
-  MAX_Y: height - 350,  // Bottom constraint considering UI elements
+// Calculate responsive game board dimensions
+const BOARD_MARGIN = 16;
+const BOARD_PADDING = 20;
+const DOT_RADIUS = 15;
+
+// Game board dimensions
+const BOARD_WIDTH = width - (BOARD_MARGIN * 2);
+const BOARD_HEIGHT = Math.min(height - 300, 400); // Constrain height for mobile
+
+// Game boundaries - properly constrained within the visible game board
+const GAME_BOUNDS = {
+  MIN_X: BOARD_PADDING + DOT_RADIUS,
+  MAX_X: BOARD_WIDTH - BOARD_PADDING - DOT_RADIUS,
+  MIN_Y: BOARD_PADDING + DOT_RADIUS,
+  MAX_Y: BOARD_HEIGHT - BOARD_PADDING - DOT_RADIUS,
 };
 
 interface GameBoardProps {
@@ -21,31 +30,36 @@ interface GameBoardProps {
 }
 
 export default function GameBoard({ levelData }: GameBoardProps) {
-  // Cable 1 (Red) - shared values for endpoints
+  // Calculate initial positions within bounds
+  const centerX = BOARD_WIDTH / 2;
+  const centerY = BOARD_HEIGHT / 2;
+  const offset = 60;
+
+  // Cable 1 (Red) - crossing diagonally
   const cable1Start = {
-    x: useSharedValue(100),
-    y: useSharedValue(150),
+    x: useSharedValue(centerX - offset),
+    y: useSharedValue(centerY - offset),
   };
   const cable1End = {
-    x: useSharedValue(250),
-    y: useSharedValue(250),
+    x: useSharedValue(centerX + offset),
+    y: useSharedValue(centerY + offset),
   };
 
-  // Cable 2 (Blue) - shared values for endpoints
+  // Cable 2 (Blue) - crossing the other way
   const cable2Start = {
-    x: useSharedValue(100),
-    y: useSharedValue(250),
+    x: useSharedValue(centerX - offset),
+    y: useSharedValue(centerY + offset),
   };
   const cable2End = {
-    x: useSharedValue(250),
-    y: useSharedValue(150),
+    x: useSharedValue(centerX + offset),
+    y: useSharedValue(centerY - offset),
   };
 
   const containerContent = (
-    <View style={styles.container}>
+    <View style={[styles.container, { height: BOARD_HEIGHT }]}>
       {/* SVG Layer - Behind dots */}
       <View style={styles.svgContainer}>
-        <Svg width="100%" height="100%" style={styles.svg}>
+        <Svg width={BOARD_WIDTH} height={BOARD_HEIGHT} style={styles.svg}>
           {/* Cable 1 - Red */}
           <RopePath
             startPoint={cable1Start}
@@ -68,26 +82,29 @@ export default function GameBoard({ levelData }: GameBoardProps) {
         <DraggableDot 
           position={cable1Start} 
           color="#E74C3C" 
-          bounds={GAME_BOARD_BOUNDS}
+          bounds={GAME_BOUNDS}
         />
         <DraggableDot 
           position={cable1End} 
           color="#E74C3C" 
-          bounds={GAME_BOARD_BOUNDS}
+          bounds={GAME_BOUNDS}
         />
 
         {/* Draggable dots for Cable 2 */}
         <DraggableDot 
           position={cable2Start} 
           color="#3498DB" 
-          bounds={GAME_BOARD_BOUNDS}
+          bounds={GAME_BOUNDS}
         />
         <DraggableDot 
           position={cable2End} 
           color="#3498DB" 
-          bounds={GAME_BOARD_BOUNDS}
+          bounds={GAME_BOUNDS}
         />
       </View>
+
+      {/* Visual boundary indicator (optional - for debugging) */}
+      <View style={styles.boundaryIndicator} />
     </View>
   );
 
@@ -97,22 +114,31 @@ export default function GameBoard({ levelData }: GameBoardProps) {
   }
 
   return (
-    <GestureHandlerRootView style={styles.container}>
+    <GestureHandlerRootView style={styles.wrapper}>
       {containerContent}
     </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  wrapper: {
     flex: 1,
+  },
+  container: {
     backgroundColor: 'rgba(15, 17, 23, 0.5)',
     borderRadius: 16,
-    margin: 16,
+    marginHorizontal: BOARD_MARGIN,
+    marginVertical: 8,
     borderWidth: 2,
     borderColor: 'rgba(24, 255, 146, 0.3)',
     overflow: 'hidden',
     position: 'relative',
+    // Add subtle shadow for depth
+    shadowColor: '#18FF92',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   svgContainer: {
     position: 'absolute',
@@ -138,5 +164,18 @@ const styles = StyleSheet.create({
     zIndex: 2,
     // Allow touch events to pass through to dots
     pointerEvents: 'box-none',
+  },
+  boundaryIndicator: {
+    position: 'absolute',
+    top: BOARD_PADDING,
+    left: BOARD_PADDING,
+    right: BOARD_PADDING,
+    bottom: BOARD_PADDING,
+    borderWidth: 1,
+    borderColor: 'rgba(24, 255, 146, 0.1)',
+    borderRadius: 8,
+    borderStyle: 'dashed',
+    pointerEvents: 'none',
+    zIndex: 0,
   },
 });

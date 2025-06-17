@@ -31,12 +31,13 @@ interface GameBoardProps {
 }
 
 export default function GameBoard({ levelData }: GameBoardProps) {
-  // Calculate initial positions within bounds - use more of the available space
+  // Calculate initial positions within bounds - make them more centralized
   const centerX = BOARD_WIDTH / 2;
   const centerY = BOARD_HEIGHT / 2;
-  const offset = Math.min(BOARD_WIDTH, BOARD_HEIGHT) * 0.25; // Scale offset based on board size
+  // Reduce the offset significantly to make ropes start closer to center
+  const offset = Math.min(BOARD_WIDTH, BOARD_HEIGHT) * 0.15; // Reduced from 0.25 to 0.15
 
-  // Cable 1 (Red) - crossing diagonally
+  // Cable 1 (Red) - crossing diagonally but closer to center
   const cable1Start = {
     x: useSharedValue(centerX - offset),
     y: useSharedValue(centerY - offset),
@@ -46,7 +47,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     y: useSharedValue(centerY + offset),
   };
 
-  // Cable 2 (Blue) - crossing the other way
+  // Cable 2 (Blue) - crossing the other way but closer to center
   const cable2Start = {
     x: useSharedValue(centerX - offset),
     y: useSharedValue(centerY + offset),
@@ -56,7 +57,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     y: useSharedValue(centerY - offset),
   };
 
-  // Initialize positions
+  // Initialize positions to be more centralized
   useEffect(() => {
     cable1Start.x.value = centerX - offset;
     cable1Start.y.value = centerY - offset;

@@ -3,7 +3,7 @@ export default {
     name: "Tangle Escape",
     slug: "tangle-escape",
     version: "1.0.0",
-    sdkVersion: "52.0.30",
+    sdkVersion: "53.0.00",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "tangle-escape",

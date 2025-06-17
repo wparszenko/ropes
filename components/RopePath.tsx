@@ -1,4 +1,5 @@
 import React from 'react';
+import { Platform } from 'react-native';
 import Animated, {
   useAnimatedProps,
 } from 'react-native-reanimated';
@@ -20,19 +21,11 @@ interface RopePathProps {
 
 export default function RopePath({ startPoint, endPoint, color }: RopePathProps) {
   const animatedProps = useAnimatedProps(() => {
-    // Ensure we have valid numbers
-    const startX = startPoint.x.value || 0;
-    const startY = startPoint.y.value || 0;
-    const endX = endPoint.x.value || 0;
-    const endY = endPoint.y.value || 0;
-
-    // Validate that all values are numbers
-    if (isNaN(startX) || isNaN(startY) || isNaN(endX) || isNaN(endY)) {
-      // Return a simple line if values are invalid
-      return {
-        d: `M 50 50 L 100 100`,
-      };
-    }
+    // Ensure we have valid numbers with fallbacks
+    const startX = typeof startPoint.x.value === 'number' && !isNaN(startPoint.x.value) ? startPoint.x.value : 50;
+    const startY = typeof startPoint.y.value === 'number' && !isNaN(startPoint.y.value) ? startPoint.y.value : 50;
+    const endX = typeof endPoint.x.value === 'number' && !isNaN(endPoint.x.value) ? endPoint.x.value : 100;
+    const endY = typeof endPoint.y.value === 'number' && !isNaN(endPoint.y.value) ? endPoint.y.value : 100;
 
     // Calculate distance between points for dynamic arc
     const distance = Math.sqrt(
@@ -55,6 +48,22 @@ export default function RopePath({ startPoint, endPoint, color }: RopePathProps)
       d: pathData,
     };
   });
+
+  // For web, we need to handle the animated props differently
+  if (Platform.OS === 'web') {
+    return (
+      <AnimatedPath
+        animatedProps={animatedProps}
+        stroke={color}
+        strokeWidth={8}
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={0.9}
+        style={{ pointerEvents: 'none' }}
+      />
+    );
+  }
 
   return (
     <AnimatedPath

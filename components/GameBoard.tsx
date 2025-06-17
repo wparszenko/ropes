@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet, Dimensions, Platform } from 'react-native';
 import { Svg } from 'react-native-svg';
 import { useSharedValue } from 'react-native-reanimated';
@@ -15,7 +15,7 @@ const DOT_RADIUS = 15;
 
 // Game board dimensions
 const BOARD_WIDTH = width - (BOARD_MARGIN * 2);
-const BOARD_HEIGHT = Math.min(height - 300, 400); // Constrain height for mobile
+const BOARD_HEIGHT = Math.min(height - 300, 400);
 
 // Game boundaries - properly constrained within the visible game board
 const GAME_BOUNDS = {
@@ -26,7 +26,7 @@ const GAME_BOUNDS = {
 };
 
 interface GameBoardProps {
-  levelData?: any; // Keep the prop for compatibility but ignore it
+  levelData?: any;
 }
 
 export default function GameBoard({ levelData }: GameBoardProps) {
@@ -54,6 +54,19 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     x: useSharedValue(centerX + offset),
     y: useSharedValue(centerY - offset),
   };
+
+  // Initialize positions
+  useEffect(() => {
+    cable1Start.x.value = centerX - offset;
+    cable1Start.y.value = centerY - offset;
+    cable1End.x.value = centerX + offset;
+    cable1End.y.value = centerY + offset;
+    
+    cable2Start.x.value = centerX - offset;
+    cable2Start.y.value = centerY + offset;
+    cable2End.x.value = centerX + offset;
+    cable2End.y.value = centerY - offset;
+  }, []);
 
   const containerContent = (
     <View style={[styles.container, { height: BOARD_HEIGHT }]}>
@@ -108,7 +121,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     </View>
   );
 
-  // For web compatibility, don't wrap in GestureHandlerRootView
+  // For web, don't wrap in GestureHandlerRootView as it can interfere
   if (Platform.OS === 'web') {
     return (
       <View style={styles.wrapper}>

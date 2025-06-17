@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, Platform, View } from 'react-native';
+import React, { useRef } from 'react';
+import { StyleSheet, Platform, View, PanResponder } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   withSpring,
@@ -43,16 +43,56 @@ export default function DraggableDot({
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
   
+  // Web-specific pan responder
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderGrant: () => {
+        startX.value = position.x.value;
+        startY.value = position.y.value;
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        const newX = clamp(
+          startX.value + gestureState.dx,
+          bounds.MIN_X,
+          bounds.MAX_X
+        );
+        const newY = clamp(
+          startY.value + gestureState.dy,
+          bounds.MIN_Y,
+          bounds.MAX_Y
+        );
+        
+        position.x.value = newX;
+        position.y.value = newY;
+      },
+      onPanResponderRelease: () => {
+        position.x.value = withSpring(position.x.value, {
+          damping: 15,
+          stiffness: 150,
+        });
+        position.y.value = withSpring(position.y.value, {
+          damping: 15,
+          stiffness: 150,
+        });
+        
+        if (onPositionChange) {
+          onPositionChange();
+        }
+      },
+    })
+  ).current;
+
+  // Native gesture handler
   const panGesture = Gesture.Pan()
     .onStart(() => {
       'worklet';
-      // Store the current position when gesture starts
       startX.value = position.x.value;
       startY.value = position.y.value;
     })
     .onUpdate((event) => {
       'worklet';
-      // Calculate new position based on starting position + translation
       const newX = clamp(
         startX.value + event.translationX,
         bounds.MIN_X,
@@ -69,7 +109,6 @@ export default function DraggableDot({
     })
     .onEnd(() => {
       'worklet';
-      // Add subtle spring animation when gesture ends
       position.x.value = withSpring(position.x.value, {
         damping: 15,
         stiffness: 150,
@@ -79,7 +118,6 @@ export default function DraggableDot({
         stiffness: 150,
       });
       
-      // Trigger intersection check
       if (onPositionChange) {
         runOnJS(onPositionChange)();
       }
@@ -88,21 +126,27 @@ export default function DraggableDot({
   const animatedStyle = useAnimatedStyle(() => {
     return {
       transform: [
-        { translateX: position.x.value - 15 }, // Center the dot (radius = 15)
+        { translateX: position.x.value - 15 },
         { translateY: position.y.value - 15 },
       ],
     };
   });
 
-  // For web compatibility, wrap in a simple View if gesture handler fails
+  // Web implementation with PanResponder
   if (Platform.OS === 'web') {
     return (
-      <View style={[styles.dotContainer, animatedStyle]}>
-        <View style={[styles.dot, { backgroundColor: color }]} />
-      </View>
+      <Animated.View 
+        style={[
+          styles.dot, 
+          { backgroundColor: color },
+          animatedStyle
+        ]}
+        {...panResponder.panHandlers}
+      />
     );
   }
 
+  // Native implementation with GestureDetector
   return (
     <GestureDetector gesture={panGesture}>
       <Animated.View 
@@ -117,11 +161,6 @@ export default function DraggableDot({
 }
 
 const styles = StyleSheet.create({
-  dotContainer: {
-    position: 'absolute',
-    width: 30,
-    height: 30,
-  },
   dot: {
     position: 'absolute',
     width: 30,
@@ -129,6 +168,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     borderWidth: 2,
     borderColor: '#FFFFFF',
+    cursor: Platform.OS === 'web' ? 'grab' : 'default',
     // Platform-specific shadows
     ...Platform.select({
       ios: {
@@ -142,9 +182,9 @@ const styles = StyleSheet.create({
       },
       web: {
         boxShadow: '0px 3px 8px rgba(0, 0, 0, 0.3)',
+        userSelect: 'none',
       },
     }),
-    // Ensure dots are always visible and interactive
     zIndex: 10,
   },
 });

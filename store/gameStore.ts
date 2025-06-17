@@ -25,6 +25,7 @@ export interface GameState {
   wireConnections: { [key: string]: boolean };
   robotPosition: { x: number; y: number };
   portalActive: boolean;
+  timeRemaining: number; // Add timer state
 }
 
 interface GameStore extends GameState {
@@ -42,6 +43,8 @@ interface GameStore extends GameState {
   loadGameState: () => void;
   getMaxStarsForLevel: (level: number) => number;
   isLevelUnlocked: (level: number) => boolean;
+  setTimeRemaining: (time: number) => void;
+  decrementTime: () => void;
 }
 
 const initialState: GameState = {
@@ -63,6 +66,7 @@ const initialState: GameState = {
   wireConnections: {},
   robotPosition: { x: 100, y: 100 },
   portalActive: false,
+  timeRemaining: 30, // 30 seconds per level
 };
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -71,7 +75,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setCurrentLevel: (level: number) => {
     const { isLevelUnlocked } = get();
     if (isLevelUnlocked(level)) {
-      set({ currentLevel: level, gameState: 'playing', portalActive: false });
+      set({ 
+        currentLevel: level, 
+        gameState: 'playing', 
+        portalActive: false,
+        timeRemaining: 30 // Reset timer for new level
+      });
     }
   },
 
@@ -80,7 +89,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gameState: 'playing', 
       wireConnections: {},
       portalActive: false,
-      robotPosition: { x: 100, y: 100 }
+      robotPosition: { x: 100, y: 100 },
+      timeRemaining: 30 // Reset timer on level reset
     });
   },
 
@@ -160,6 +170,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         wireConnections: {},
         robotPosition: { x: 100, y: 100 },
         portalActive: false,
+        timeRemaining: 30,
       });
       
       console.log('Progress reset completed successfully');
@@ -183,6 +194,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         wireConnections: {},
         robotPosition: { x: 100, y: 100 },
         portalActive: false,
+        timeRemaining: 30,
       });
       
       throw error; // Re-throw to let the UI handle the error
@@ -212,15 +224,32 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   getMaxStarsForLevel: (level: number) => {
-    // Progressive star system: lower levels have fewer max stars
-    if (level <= 5) return 2;      // Levels 1-5: max 2 stars
-    if (level <= 15) return 3;     // Levels 6-15: max 3 stars
-    return 4;                      // Levels 16+: max 4 stars
+    // Progressive star system based on difficulty
+    if (level <= 5) return 1;      // Easy levels: max 1 star
+    if (level <= 15) return 2;     // Medium levels: max 2 stars  
+    return 3;                      // Hard levels: max 3 stars
   },
 
   isLevelUnlocked: (level: number) => {
     const { playerStats } = get();
     return level <= playerStats.highestUnlockedLevel;
+  },
+
+  setTimeRemaining: (time: number) => {
+    set({ timeRemaining: time });
+  },
+
+  decrementTime: () => {
+    const { timeRemaining, gameState } = get();
+    if (gameState === 'playing' && timeRemaining > 0) {
+      const newTime = timeRemaining - 1;
+      set({ timeRemaining: newTime });
+      
+      // Fail level when time runs out
+      if (newTime <= 0) {
+        get().failLevel();
+      }
+    }
   },
 
   saveGameState: async () => {

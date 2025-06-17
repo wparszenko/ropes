@@ -82,12 +82,22 @@ function getRandomPoint(bounds: GameBounds): RopeEndpoint {
   };
 }
 
-// Generate ropes that are guaranteed to intersect
+// Generate ropes that are guaranteed to intersect with better positioning
 export function generateCrossedRopes(ropeCount: number, bounds: GameBounds): Rope[] {
   const ropes: Rope[] = [];
+  
+  // Calculate center and adjusted bounds for better rope positioning
   const centerX = (bounds.minX + bounds.maxX) / 2;
   const centerY = (bounds.minY + bounds.maxY) / 2;
-  const maxRadius = Math.min(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) * 0.4;
+  
+  // Make the play area more centered and higher up
+  const playAreaWidth = (bounds.maxX - bounds.minX) * 0.7; // Reduced from 0.8
+  const playAreaHeight = (bounds.maxY - bounds.minY) * 0.6; // Reduced from 0.8
+  
+  // Shift the center up by 20% of the height
+  const adjustedCenterY = centerY - (bounds.maxY - bounds.minY) * 0.1;
+  
+  const maxRadius = Math.min(playAreaWidth, playAreaHeight) * 0.4;
 
   // Create ropes in a pattern that ensures they cross each other
   for (let i = 0; i < ropeCount; i++) {
@@ -100,47 +110,48 @@ export function generateCrossedRopes(ropeCount: number, bounds: GameBounds): Rop
     if (ropeCount === 2) {
       // Simple X pattern
       if (i === 0) {
-        start = { x: centerX - maxRadius * 0.8, y: centerY - maxRadius * 0.8 };
-        end = { x: centerX + maxRadius * 0.8, y: centerY + maxRadius * 0.8 };
+        start = { x: centerX - maxRadius * 0.8, y: adjustedCenterY - maxRadius * 0.6 };
+        end = { x: centerX + maxRadius * 0.8, y: adjustedCenterY + maxRadius * 0.6 };
       } else {
-        start = { x: centerX - maxRadius * 0.8, y: centerY + maxRadius * 0.8 };
-        end = { x: centerX + maxRadius * 0.8, y: centerY - maxRadius * 0.8 };
+        start = { x: centerX - maxRadius * 0.8, y: adjustedCenterY + maxRadius * 0.6 };
+        end = { x: centerX + maxRadius * 0.8, y: adjustedCenterY - maxRadius * 0.6 };
       }
     } else if (ropeCount === 3) {
       // Triangle with crossing lines
       const angle = (i * 2 * Math.PI) / 3;
       const oppositeAngle = angle + Math.PI;
       start = {
-        x: centerX + Math.cos(angle) * maxRadius,
-        y: centerY + Math.sin(angle) * maxRadius,
+        x: centerX + Math.cos(angle) * maxRadius * 0.8,
+        y: adjustedCenterY + Math.sin(angle) * maxRadius * 0.6,
       };
       end = {
-        x: centerX + Math.cos(oppositeAngle) * maxRadius * 0.7,
-        y: centerY + Math.sin(oppositeAngle) * maxRadius * 0.7,
+        x: centerX + Math.cos(oppositeAngle) * maxRadius * 0.6,
+        y: adjustedCenterY + Math.sin(oppositeAngle) * maxRadius * 0.5,
       };
     } else {
       // For 4+ ropes, create a more complex crossing pattern
       const baseAngle = (i * 2 * Math.PI) / ropeCount;
       const offsetAngle = baseAngle + Math.PI * (0.6 + (i % 3) * 0.2);
       
-      const startRadius = maxRadius * (0.8 + (i % 2) * 0.2);
-      const endRadius = maxRadius * (0.7 + ((i + 1) % 2) * 0.3);
+      const startRadius = maxRadius * (0.7 + (i % 2) * 0.2);
+      const endRadius = maxRadius * (0.6 + ((i + 1) % 2) * 0.3);
       
       start = {
         x: centerX + Math.cos(baseAngle) * startRadius,
-        y: centerY + Math.sin(baseAngle) * startRadius,
+        y: adjustedCenterY + Math.sin(baseAngle) * startRadius * 0.7, // Compress vertically
       };
       end = {
         x: centerX + Math.cos(offsetAngle) * endRadius,
-        y: centerY + Math.sin(offsetAngle) * endRadius,
+        y: adjustedCenterY + Math.sin(offsetAngle) * endRadius * 0.7, // Compress vertically
       };
     }
 
-    // Ensure points are within bounds
-    start.x = Math.max(bounds.minX, Math.min(bounds.maxX, start.x));
-    start.y = Math.max(bounds.minY, Math.min(bounds.maxY, start.y));
-    end.x = Math.max(bounds.minX, Math.min(bounds.maxX, end.x));
-    end.y = Math.max(bounds.minY, Math.min(bounds.maxY, end.y));
+    // Ensure points are within bounds with some padding
+    const padding = 20;
+    start.x = Math.max(bounds.minX + padding, Math.min(bounds.maxX - padding, start.x));
+    start.y = Math.max(bounds.minY + padding, Math.min(bounds.maxY - padding, start.y));
+    end.x = Math.max(bounds.minX + padding, Math.min(bounds.maxX - padding, end.x));
+    end.y = Math.max(bounds.minY + padding, Math.min(bounds.maxY - padding, end.y));
 
     ropes.push({
       id: `rope_${i}`,
@@ -156,17 +167,18 @@ export function generateCrossedRopes(ropeCount: number, bounds: GameBounds): Rop
     // Slightly adjust rope positions to ensure crossings
     for (let i = 0; i < ropes.length; i++) {
       const rope = ropes[i];
-      const adjustment = 20;
+      const adjustment = 15; // Reduced adjustment for more stable positioning
       rope.start.x += (Math.random() - 0.5) * adjustment;
       rope.start.y += (Math.random() - 0.5) * adjustment;
       rope.end.x += (Math.random() - 0.5) * adjustment;
       rope.end.y += (Math.random() - 0.5) * adjustment;
 
-      // Keep within bounds
-      rope.start.x = Math.max(bounds.minX, Math.min(bounds.maxX, rope.start.x));
-      rope.start.y = Math.max(bounds.minY, Math.min(bounds.maxY, rope.start.y));
-      rope.end.x = Math.max(bounds.minX, Math.min(bounds.maxX, rope.end.x));
-      rope.end.y = Math.max(bounds.minY, Math.min(bounds.maxY, rope.end.y));
+      // Keep within bounds with padding
+      const padding = 20;
+      rope.start.x = Math.max(bounds.minX + padding, Math.min(bounds.maxX - padding, rope.start.x));
+      rope.start.y = Math.max(bounds.minY + padding, Math.min(bounds.maxY - padding, rope.start.y));
+      rope.end.x = Math.max(bounds.minX + padding, Math.min(bounds.maxX - padding, rope.end.x));
+      rope.end.y = Math.max(bounds.minY + padding, Math.min(bounds.maxY - padding, rope.end.y));
     }
     attempts++;
   }

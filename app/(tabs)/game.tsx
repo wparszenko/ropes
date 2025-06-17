@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, Dimensions, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, RotateCcw, Lightbulb, Chrome as Home } from 'lucide-react-native';
+import { ArrowLeft, RotateCcw, Lightbulb, Chrome as Home, Clock } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useGameStore } from '@/store/gameStore';
 import { useRopeStore } from '@/store/ropeStore';
 import GameBoard from '@/components/GameBoard';
 import LevelCompleteModal from '@/components/LevelCompleteModal';
+import LevelFailedModal from '@/components/LevelFailedModal';
 import { gameScreenStyles } from '@/styles/gameScreenStyles';
 
 const { width, height } = Dimensions.get('window');
@@ -15,67 +16,88 @@ export default function GameScreen() {
   const {
     currentLevel,
     gameState,
+    timeRemaining,
     resetLevel: resetGameLevel,
     getCurrentLevelData,
     getMaxStarsForLevel,
+    setTimeRemaining,
+    decrementTime,
   } = useGameStore();
 
   const { resetLevel: resetRopeLevel, ropes, intersectionCount } = useRopeStore();
 
   const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [showFailedModal, setShowFailedModal] = useState(false);
   const [levelData, setLevelData] = useState(null);
-  const [gameTime, setGameTime] = useState(0);
   const [modalStars, setModalStars] = useState(0);
   
   // Add ref to track if modal has been shown for current level
   const modalShownForLevel = useRef<number | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const data = getCurrentLevelData();
     setLevelData(data);
   }, [currentLevel]);
 
+  // Timer effect
   useEffect(() => {
-    // Only show modal if it hasn't been shown for this level yet
+    if (gameState === 'playing') {
+      // Start timer
+      timerRef.current = setInterval(() => {
+        decrementTime();
+      }, 1000);
+    } else {
+      // Stop timer
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [gameState, decrementTime]);
+
+  // Handle level completion
+  useEffect(() => {
     if (
       gameState === 'completed' && 
       !showCompleteModal && 
       modalShownForLevel.current !== currentLevel
     ) {
-      // Calculate stars based on performance
+      // Calculate stars based on performance and difficulty
       const maxStars = getMaxStarsForLevel(currentLevel);
-      const baseStars = 1;
+      let earnedStars = 1; // Base star for completion
       
-      // Performance-based star calculation
-      let performanceStars = 0;
-      if (intersectionCount === 0) {
-        if (gameTime < 30) performanceStars = maxStars - 1; // Fast completion
-        else if (gameTime < 60) performanceStars = Math.max(1, maxStars - 2); // Medium completion
-        else performanceStars = Math.max(0, maxStars - 3); // Slow completion
-      }
+      // Time bonus (faster completion = more stars)
+      if (timeRemaining > 20 && maxStars >= 2) earnedStars = 2;
+      if (timeRemaining > 25 && maxStars >= 3) earnedStars = 3;
       
-      const totalStars = Math.min(baseStars + performanceStars, maxStars);
-      setModalStars(totalStars);
+      setModalStars(earnedStars);
       setShowCompleteModal(true);
-      modalShownForLevel.current = currentLevel; // Mark modal as shown for this level
+      modalShownForLevel.current = currentLevel;
     }
-  }, [gameState, showCompleteModal, currentLevel, getMaxStarsForLevel, intersectionCount, gameTime]);
+  }, [gameState, showCompleteModal, currentLevel, getMaxStarsForLevel, timeRemaining]);
+
+  // Handle level failure
+  useEffect(() => {
+    if (gameState === 'failed' && !showFailedModal) {
+      setShowFailedModal(true);
+    }
+  }, [gameState, showFailedModal]);
 
   // Reset modal tracking when level changes
   useEffect(() => {
     modalShownForLevel.current = null;
     setShowCompleteModal(false);
-  }, [currentLevel]);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (gameState === 'playing') {
-      interval = setInterval(() => {
-        setGameTime(prev => prev + 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [gameState]);
+    setShowFailedModal(false);
+    setTimeRemaining(30); // Reset timer for new level
+  }, [currentLevel, setTimeRemaining]);
 
   const handleBack = () => {
     router.back();
@@ -84,9 +106,9 @@ export default function GameScreen() {
   const handleReset = () => {
     resetGameLevel();
     resetRopeLevel();
-    setGameTime(0);
-    setShowCompleteModal(false); // Ensure modal is closed on reset
-    modalShownForLevel.current = null; // Reset modal tracking
+    setShowCompleteModal(false);
+    setShowFailedModal(false);
+    modalShownForLevel.current = null;
   };
 
   const handleHint = () => {
@@ -105,13 +127,13 @@ export default function GameScreen() {
 
   const handleNextLevel = () => {
     setShowCompleteModal(false);
-    modalShownForLevel.current = null; // Reset modal tracking
-    // Modal will handle navigation internally
+    modalShownForLevel.current = null;
   };
 
   const handleCloseModal = () => {
     setShowCompleteModal(false);
-    modalShownForLevel.current = null; // Reset modal tracking
+    setShowFailedModal(false);
+    modalShownForLevel.current = null;
   };
 
   const formatTime = (seconds: number) => {
@@ -159,8 +181,14 @@ export default function GameScreen() {
         {/* Game Stats */}
         <View style={gameScreenStyles.gameStats}>
           <View style={gameScreenStyles.statItem}>
+            <Clock size={16} color={timeRemaining <= 10 ? '#FF5050' : '#FFE347'} />
+            <Text style={[
+              gameScreenStyles.statValue, 
+              { color: timeRemaining <= 10 ? '#FF5050' : '#FFE347' }
+            ]}>
+              {timeRemaining}s
+            </Text>
             <Text style={gameScreenStyles.statLabel}>Time</Text>
-            <Text style={gameScreenStyles.statValue}>{formatTime(gameTime)}</Text>
           </View>
           <View style={gameScreenStyles.statItem}>
             <Text style={gameScreenStyles.statLabel}>Ropes</Text>
@@ -199,6 +227,14 @@ export default function GameScreen() {
         onClose={handleCloseModal}
         onNextLevel={handleNextLevel}
         stars={modalStars}
+        level={currentLevel}
+      />
+
+      {/* Level Failed Modal */}
+      <LevelFailedModal
+        visible={showFailedModal}
+        onClose={handleCloseModal}
+        onRetry={handleReset}
         level={currentLevel}
       />
     </View>

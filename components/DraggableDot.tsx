@@ -46,6 +46,7 @@ export default function DraggableDot({
   // Store the starting position when gesture begins
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
+  const isDragging = useSharedValue(false);
   
   // Web-specific pan responder
   const panResponder = useRef(
@@ -55,7 +56,8 @@ export default function DraggableDot({
       onPanResponderGrant: () => {
         startX.value = position.x.value;
         startY.value = position.y.value;
-        setDragging(true); // Set dragging state
+        isDragging.value = true;
+        setDragging(true);
       },
       onPanResponderMove: (evt, gestureState) => {
         const newX = clamp(
@@ -77,16 +79,21 @@ export default function DraggableDot({
         }
       },
       onPanResponderRelease: () => {
+        isDragging.value = false;
+        
+        // Smooth spring animation on release
         position.x.value = withSpring(position.x.value, {
-          damping: 15,
-          stiffness: 150,
+          damping: 20,
+          stiffness: 200,
+          mass: 0.8,
         });
         position.y.value = withSpring(position.y.value, {
-          damping: 15,
-          stiffness: 150,
+          damping: 20,
+          stiffness: 200,
+          mass: 0.8,
         });
         
-        setDragging(false); // End dragging state
+        setDragging(false);
         
         if (onPositionChange) {
           onPositionChange();
@@ -95,13 +102,14 @@ export default function DraggableDot({
     })
   ).current;
 
-  // Native gesture handler with improved sensitivity
+  // Native gesture handler with improved sensitivity and stability
   const panGesture = Gesture.Pan()
     .onStart(() => {
       'worklet';
       startX.value = position.x.value;
       startY.value = position.y.value;
-      runOnJS(setDragging)(true); // Set dragging state
+      isDragging.value = true;
+      runOnJS(setDragging)(true);
     })
     .onUpdate((event) => {
       'worklet';
@@ -125,29 +133,38 @@ export default function DraggableDot({
     })
     .onEnd(() => {
       'worklet';
+      isDragging.value = false;
+      
+      // Smooth spring animation on release
       position.x.value = withSpring(position.x.value, {
-        damping: 15,
-        stiffness: 150,
+        damping: 20,
+        stiffness: 200,
+        mass: 0.8,
       });
       position.y.value = withSpring(position.y.value, {
-        damping: 15,
-        stiffness: 150,
+        damping: 20,
+        stiffness: 200,
+        mass: 0.8,
       });
       
-      runOnJS(setDragging)(false); // End dragging state
+      runOnJS(setDragging)(false);
       
       if (onPositionChange) {
         runOnJS(onPositionChange)();
       }
     })
     .minDistance(0) // Allow immediate response to touch
-    .shouldCancelWhenOutside(false); // Don't cancel when dragging outside
+    .shouldCancelWhenOutside(false) // Don't cancel when dragging outside
+    .activateAfterLongPress(0); // Immediate activation
 
   const animatedStyle = useAnimatedStyle(() => {
+    const scale = isDragging.value ? 1.2 : 1.0; // Scale up when dragging
+    
     return {
       transform: [
-        { translateX: position.x.value - 20 }, // Increased from 15 to 20 for larger touch area
-        { translateY: position.y.value - 20 },
+        { translateX: position.x.value - 25 }, // Adjusted for larger dot size
+        { translateY: position.y.value - 25 },
+        { scale: withSpring(scale, { damping: 15, stiffness: 200 }) },
       ],
     };
   });

@@ -58,11 +58,11 @@ export const gameScreenStyles = StyleSheet.create({
   },
   statItem: {
     alignItems: 'center',
+    gap: 4,
   },
   statLabel: {
     fontSize: 12,
     color: '#9CA3AF',
-    marginBottom: 4,
   },
   statValue: {
     fontSize: 16,

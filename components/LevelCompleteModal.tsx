@@ -21,7 +21,7 @@ export default function LevelCompleteModal({
   stars,
   level,
 }: LevelCompleteModalProps) {
-  const { getMaxStarsForLevel, setCurrentLevel, isLevelUnlocked } = useGameStore();
+  const { getMaxStarsForLevel, setCurrentLevel, isLevelUnlocked, resetLevel } = useGameStore();
   const maxStars = getMaxStarsForLevel(level);
   const nextLevel = level + 1;
   const hasNextLevel = isLevelUnlocked(nextLevel);
@@ -39,20 +39,20 @@ export default function LevelCompleteModal({
   };
 
   const handleHome = () => {
-    router.push('/');
     onClose();
+    router.push('/');
   };
 
   const handleRetry = () => {
     onClose();
-    // This will trigger a level reset in the parent component
+    resetLevel(); // Reset the current level
   };
 
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="slide"
       onRequestClose={onClose}
     >
       <View style={levelCompleteModalStyles.overlay}>
@@ -113,7 +113,10 @@ export default function LevelCompleteModal({
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
-                onPress={() => router.push('/levels')}
+                onPress={() => {
+                  onClose();
+                  router.push('/levels');
+                }}
                 style={[levelCompleteModalStyles.button, levelCompleteModalStyles.nextButton]}
               >
                 <Text style={levelCompleteModalStyles.nextButtonText}>

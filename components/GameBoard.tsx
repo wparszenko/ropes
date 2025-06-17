@@ -61,6 +61,7 @@ const doLinesIntersect = (
 };
 
 export default function GameBoard({ levelData }: GameBoardProps) {
+  // Always call hooks at the top level, regardless of levelData
   const { completeLevel, activatePortal } = useGameStore();
   const [ropeEndpoints, setRopeEndpoints] = useState<RopeEndpoints>({});
   const [hasIntersections, setHasIntersections] = useState(true);
@@ -240,6 +241,12 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     </GestureHandlerRootView>
   );
 }
+
+// Create shared values outside of the component to avoid hook issues
+const createSharedValues = (x: number, y: number) => ({
+  x: useSharedValue(x),
+  y: useSharedValue(y),
+});
 
 const styles = StyleSheet.create({
   container: {

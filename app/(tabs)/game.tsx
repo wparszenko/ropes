@@ -72,7 +72,13 @@ export default function GameScreen() {
     failLevel,
   } = useGameStore();
 
-  const { resetLevel: resetRopeLevel, ropes, intersectionCount } = useRopeStore();
+  const { 
+    resetLevel: resetRopeLevel, 
+    ropes, 
+    intersectionCount,
+    cleanupLevel, // New cleanup method
+    currentLevel: ropeCurrentLevel 
+  } = useRopeStore();
 
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showFailedModal, setShowFailedModal] = useState(false);
@@ -126,6 +132,14 @@ export default function GameScreen() {
     };
   }, [handleTimerTick, handleTimerComplete]);
 
+  // Clean up rope data when level changes to prevent memory leaks
+  useEffect(() => {
+    if (ropeCurrentLevel !== currentLevel && ropeCurrentLevel > 0) {
+      console.log(`Level changed from ${ropeCurrentLevel} to ${currentLevel}, cleaning up rope data`);
+      cleanupLevel();
+    }
+  }, [currentLevel, ropeCurrentLevel, cleanupLevel]);
+
   // Reset level data and timer when level changes
   useEffect(() => {
     const data = getCurrentLevelData();
@@ -172,35 +186,25 @@ export default function GameScreen() {
   useEffect(() => {
     if (
       levelState === 'completed' && 
-      !showCompleteModal && 
-      !modalClosingRef.current &&
-      modalShownForLevel.current !== currentLevel
+      ropes.length > 0 && 
+      !completionTriggeredRef.current && 
+      gameState === 'playing' &&
+      !isDragging &&
+      isInitialized
     ) {
-      // Stop timer immediately on completion
-      gameTimerRef.current?.stop();
-
-      const timeElapsed = 30 - timeRemaining;
-      setCompletionTime(timeElapsed);
+      completionTriggeredRef.current = true;
       
-      // New star system based on completion time
-      let earnedStars = 0;
-      if (timeElapsed <= 5) {
-        earnedStars = 3; // 3 stars for completion in 5 seconds or less
-      } else if (timeElapsed <= 10) {
-        earnedStars = 2; // 2 stars for completion in 10 seconds or less
-      } else if (timeElapsed <= 20) {
-        earnedStars = 1; // 1 star for completion in 20 seconds or less
-      } else {
-        earnedStars = 0; // No stars for completion over 20 seconds
-      }
-      
-      setModalStars(earnedStars);
-      
-      // Show modal immediately
-      setShowCompleteModal(true);
-      modalShownForLevel.current = currentLevel;
+      setTimeout(() => {
+        // Calculate stars based on performance
+        const baseStars = 1;
+        const timeBonus = intersectionCount === 0 ? 1 : 0; // Bonus for perfect solution
+        const efficiencyBonus = currentLevel <= 3 ? 1 : currentLevel <= 6 ? 2 : 3; // Progressive bonus
+        
+        const totalStars = Math.min(baseStars + timeBonus + efficiencyBonus, 4); // Max 4 stars
+        completeLevel(totalStars);
+      }, 300); // Reduced delay for better responsiveness
     }
-  }, [levelState, showCompleteModal, currentLevel, timeRemaining]);
+  }, [levelState, ropes.length, currentLevel, completeLevel, intersectionCount, gameState]);
 
   // Handle level failure - only show when actually failed and stop timer
   useEffect(() => {
@@ -218,9 +222,20 @@ export default function GameScreen() {
     }
   }, [levelState, showFailedModal, currentLevel]);
 
+  // Cleanup when leaving the game screen
+  useEffect(() => {
+    return () => {
+      console.log('Game screen unmounting, cleaning up timer and rope data');
+      gameTimerRef.current?.destroy();
+      cleanupLevel(); // Clean up rope data when leaving game
+    };
+  }, [cleanupLevel]);
+
   const handleBack = () => {
     // Stop and destroy timer when leaving game
     gameTimerRef.current?.stop();
+    // Clean up rope data to prevent memory leaks
+    cleanupLevel();
     router.back();
   };
 
@@ -235,9 +250,12 @@ export default function GameScreen() {
     setShowFailedModal(false);
     modalShownForLevel.current = null;
     
+    // Clean up current rope data before reset
+    cleanupLevel();
+    
     // Reset both game and rope stores to restart the current level
     resetGameLevel(); // This sets levelState to 'fresh'
-    resetRopeLevel();
+    resetRopeLevel(); // This will generate fresh ropes
     
     setTimeout(() => {
       modalClosingRef.current = false;
@@ -257,6 +275,8 @@ export default function GameScreen() {
   const handleHome = () => {
     // Stop and destroy timer when going home
     gameTimerRef.current?.stop();
+    // Clean up rope data to prevent memory leaks
+    cleanupLevel();
     router.push('/');
   };
 
@@ -264,6 +284,9 @@ export default function GameScreen() {
     modalClosingRef.current = true;
     setShowCompleteModal(false);
     modalShownForLevel.current = null;
+    
+    // Clean up current level data before moving to next
+    cleanupLevel();
     
     setTimeout(() => {
       modalClosingRef.current = false;

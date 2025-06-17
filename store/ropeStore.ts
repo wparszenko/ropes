@@ -16,7 +16,8 @@ export interface RopeState {
   bounds: GameBounds | null;
   isDragging: boolean;
   isInitialized: boolean;
-  dragCount: number; // Track number of active drags
+  dragCount: number;
+  currentLevel: number; // Track current level to detect changes
 }
 
 interface RopeStore extends RopeState {
@@ -27,7 +28,8 @@ interface RopeStore extends RopeState {
   getCurrentRopes: () => Rope[];
   setDragging: (dragging: boolean) => void;
   clearAll: () => void;
-  validatePositions: () => void; // Add position validation
+  validatePositions: () => void;
+  cleanupLevel: () => void; // New method for thorough cleanup
 }
 
 const initialState: RopeState = {
@@ -39,6 +41,7 @@ const initialState: RopeState = {
   isDragging: false,
   isInitialized: false,
   dragCount: 0,
+  currentLevel: 0,
 };
 
 export const useRopeStore = create<RopeStore>((set, get) => ({
@@ -47,28 +50,38 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
   initializeLevel: (level: number, bounds: GameBounds) => {
     try {
       console.log('Initializing rope level', level);
+      
+      // Clean up previous level data first
+      const currentState = get();
+      if (currentState.currentLevel !== level) {
+        console.log('Level changed, cleaning up previous level data');
+        get().cleanupLevel();
+      }
+      
       const ropeCount = Math.min(level + 1, 10);
+      
+      // Generate fresh ropes for this level - no memory of previous states
       const generatedRopes = generateCrossedRopes(ropeCount, bounds);
       
-      // Initialize positions from generated ropes with validation
+      // Create fresh positions - completely new data
       const positions: { [ropeId: string]: RopePosition } = {};
       generatedRopes.forEach(rope => {
-        // Validate rope positions
-        const startX = isNaN(rope.start.x) ? bounds.minX + 50 : rope.start.x;
-        const startY = isNaN(rope.start.y) ? bounds.minY + 50 : rope.start.y;
-        const endX = isNaN(rope.end.x) ? bounds.maxX - 50 : rope.end.x;
-        const endY = isNaN(rope.end.y) ? bounds.maxY - 50 : rope.end.y;
+        // Validate and clamp positions within bounds
+        const startX = Math.max(bounds.minX, Math.min(bounds.maxX, 
+          isNaN(rope.start.x) ? bounds.minX + 50 : rope.start.x));
+        const startY = Math.max(bounds.minY, Math.min(bounds.maxY, 
+          isNaN(rope.start.y) ? bounds.minY + 50 : rope.start.y));
+        const endX = Math.max(bounds.minX, Math.min(bounds.maxX, 
+          isNaN(rope.end.x) ? bounds.maxX - 50 : rope.end.x));
+        const endY = Math.max(bounds.minY, Math.min(bounds.maxY, 
+          isNaN(rope.end.y) ? bounds.maxY - 50 : rope.end.y));
         
-        positions[rope.id] = {
-          startX: Math.max(bounds.minX, Math.min(bounds.maxX, startX)),
-          startY: Math.max(bounds.minY, Math.min(bounds.maxY, startY)),
-          endX: Math.max(bounds.minX, Math.min(bounds.maxX, endX)),
-          endY: Math.max(bounds.minY, Math.min(bounds.maxY, endY)),
-        };
+        positions[rope.id] = { startX, startY, endX, endY };
       });
 
       const initialIntersections = countIntersections(generatedRopes);
 
+      // Set completely fresh state
       set({
         ropes: generatedRopes,
         ropePositions: positions,
@@ -78,21 +91,19 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
         isDragging: false,
         isInitialized: true,
         dragCount: 0,
+        currentLevel: level,
       });
 
-      console.log('Rope level initialized with', generatedRopes.length, 'ropes and', initialIntersections, 'intersections');
+      console.log(`Level ${level} initialized with ${generatedRopes.length} ropes and ${initialIntersections} intersections`);
     } catch (error) {
       console.error('Failed to initialize level:', error);
-      // Fallback initialization
+      // Fallback to clean state
+      get().cleanupLevel();
       set({
-        ropes: [],
-        ropePositions: {},
-        intersectionCount: 0,
-        isCompleted: false,
+        ...initialState,
         bounds,
-        isDragging: false,
         isInitialized: true,
-        dragCount: 0,
+        currentLevel: level,
       });
     }
   },
@@ -137,7 +148,7 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
     if (state.dragCount === 0) {
       setTimeout(() => {
         get().checkIntersections();
-      }, 50); // Small delay to batch updates
+      }, 50);
     }
   },
 
@@ -184,7 +195,7 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
     if (newDragCount === 0) {
       setTimeout(() => {
         get().checkIntersections();
-      }, 100); // Small delay to ensure position updates are complete
+      }, 100);
     }
   },
 
@@ -212,23 +223,40 @@ export const useRopeStore = create<RopeStore>((set, get) => ({
 
   resetLevel: () => {
     console.log('Resetting rope level');
-    const { bounds } = get();
-    if (bounds) {
-      // Re-initialize with current bounds
-      const state = get();
-      const level = state.ropes.length - 1; // Approximate level from rope count
-      get().initializeLevel(Math.max(1, level), bounds);
+    const { bounds, currentLevel } = get();
+    if (bounds && currentLevel > 0) {
+      // Clean up current data and re-initialize fresh
+      get().cleanupLevel();
+      get().initializeLevel(currentLevel, bounds);
     } else {
       // Reset to initial state if no bounds
-      set({
-        ...initialState,
-        isInitialized: false,
-      });
+      set(initialState);
+    }
+  },
+
+  cleanupLevel: () => {
+    console.log('Cleaning up level data to prevent memory leaks');
+    
+    // Clear all rope data
+    set({
+      ropes: [],
+      ropePositions: {},
+      intersectionCount: 0,
+      isCompleted: false,
+      isDragging: false,
+      isInitialized: false,
+      dragCount: 0,
+    });
+    
+    // Force garbage collection hint (if available)
+    if (typeof global !== 'undefined' && global.gc) {
+      global.gc();
     }
   },
 
   clearAll: () => {
     console.log('Clearing all rope data');
+    get().cleanupLevel();
     set(initialState);
   },
 }));

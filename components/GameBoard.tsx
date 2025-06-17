@@ -15,7 +15,7 @@ const { width, height } = Dimensions.get('window');
 // Calculate responsive game board dimensions
 const BOARD_MARGIN = 16;
 const BOARD_PADDING = 30;
-const DOT_RADIUS = 25; // Increased for better touch target
+const DOT_RADIUS = 25;
 
 // Make the game board much taller and more responsive
 const BOARD_WIDTH = width - (BOARD_MARGIN * 2);
@@ -48,6 +48,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     updateRopePosition,
     checkIntersections,
     validatePositions,
+    cleanupLevel, // New cleanup method
   } = useRopeStore();
 
   // Add ref to track if level completion has been triggered
@@ -68,6 +69,16 @@ export default function GameBoard({ levelData }: GameBoardProps) {
     });
   }
 
+  // Clean up when level changes
+  useEffect(() => {
+    if (currentLevel !== levelRef.current) {
+      console.log(`GameBoard: Level changed from ${levelRef.current} to ${currentLevel}, cleaning up`);
+      cleanupLevel(); // Clean up previous level data
+      completionTriggeredRef.current = false;
+      levelRef.current = currentLevel;
+    }
+  }, [currentLevel, cleanupLevel]);
+
   // Initialize level when component mounts or level changes
   useEffect(() => {
     if (currentLevel !== levelRef.current || !isInitialized) {
@@ -79,6 +90,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
       // Add a small delay to ensure proper initialization
       initializationTimeoutRef.current = setTimeout(() => {
         try {
+          console.log(`GameBoard: Initializing level ${currentLevel}`);
           initializeLevel(currentLevel, GAME_BOUNDS);
           completionTriggeredRef.current = false;
           levelRef.current = currentLevel;
@@ -164,6 +176,20 @@ export default function GameBoard({ levelData }: GameBoardProps) {
       completionTriggeredRef.current = false;
     }
   }, [gameState]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      console.log('GameBoard: Unmounting, cleaning up data');
+      cleanupLevel();
+      if (initializationTimeoutRef.current) {
+        clearTimeout(initializationTimeoutRef.current);
+      }
+      if (positionUpdateTimeoutRef.current) {
+        clearTimeout(positionUpdateTimeoutRef.current);
+      }
+    };
+  }, [cleanupLevel]);
 
   // Enhanced position change handler with validation
   const handlePositionChange = useCallback((ropeId: string, endpoint: 'start' | 'end', sharedX: any, sharedY: any) => {

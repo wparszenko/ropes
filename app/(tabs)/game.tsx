@@ -54,9 +54,10 @@ export default function GameScreen() {
   };
 
   const handleHint = () => {
+    const ropeCount = Math.min(currentLevel + 1, 10);
     Alert.alert(
       'How to Play',
-      'Drag the colored dots to move the rope endpoints. Your goal is to untangle all ropes so that none of them cross each other. When all ropes are untangled, you win!',
+      `Drag the colored dots to move the rope endpoints. Your goal is to untangle all ${ropeCount} ropes so that none of them cross each other. When all ropes are untangled, you win!\n\nTip: Try to identify which ropes are crossing and move their endpoints to separate them.`,
       [{ text: 'Got it!' }]
     );
   };
@@ -89,6 +90,8 @@ export default function GameScreen() {
     );
   }
 
+  const ropeCount = Math.min(currentLevel + 1, 10);
+
   return (
     <View style={styles.container}>
       <LinearGradient colors={['#0F1117', '#1A1D29']} style={styles.gradient}>
@@ -101,7 +104,7 @@ export default function GameScreen() {
           <View style={styles.headerCenter}>
             <Text style={styles.levelTitle}>LEVEL {currentLevel}</Text>
             <Text style={styles.levelSubtitle}>
-              Untangle the Ropes
+              Untangle {ropeCount} Ropes
             </Text>
           </View>
 
@@ -118,7 +121,7 @@ export default function GameScreen() {
           </View>
           <View style={styles.statItem}>
             <Text style={styles.statLabel}>Ropes</Text>
-            <Text style={styles.statValue}>{levelData.wires.length}</Text>
+            <Text style={styles.statValue}>{ropeCount}</Text>
           </View>
           <View style={styles.statItem}>
             <Text style={styles.statLabel}>Difficulty</Text>

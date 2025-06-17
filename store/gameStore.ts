@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { levelData } from '@/data/levels';
+import { getLevelData } from '@/data/levels';
 
 export interface PlayerStats {
   completedLevels: number;
@@ -138,7 +138,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   getCurrentLevelData: () => {
     const { currentLevel } = get();
-    return levelData[currentLevel - 1] || levelData[0];
+    return getLevelData(currentLevel);
   },
 
   saveGameState: async () => {

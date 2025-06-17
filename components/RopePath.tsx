@@ -37,7 +37,8 @@ export default function RopePath({ startPoint, endPoint, color }: RopePathProps)
     const midY = (startY + endY) / 2;
     
     // Dynamic arc height based on distance (more realistic rope physics)
-    const arcHeight = Math.min(distance * 0.25, 80);
+    // Make the arc more pronounced for longer ropes
+    const arcHeight = Math.min(distance * 0.3, 100);
     const controlX = midX;
     const controlY = midY + arcHeight; // Downward arc for gravity effect
 
@@ -49,27 +50,11 @@ export default function RopePath({ startPoint, endPoint, color }: RopePathProps)
     };
   });
 
-  // For web, we need to handle the animated props differently
-  if (Platform.OS === 'web') {
-    return (
-      <AnimatedPath
-        animatedProps={animatedProps}
-        stroke={color}
-        strokeWidth={8}
-        fill="none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity={0.9}
-        pointerEvents="none"
-      />
-    );
-  }
-
   return (
     <AnimatedPath
       animatedProps={animatedProps}
       stroke={color}
-      strokeWidth={8}
+      strokeWidth={12} // Made ropes thicker/longer looking
       fill="none"
       strokeLinecap="round"
       strokeLinejoin="round"

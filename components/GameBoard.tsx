@@ -1,29 +1,30 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, Dimensions, Platform } from 'react-native';
 import { Svg } from 'react-native-svg';
 import { useSharedValue } from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import DraggableDot from '@/components/DraggableDot';
 import RopePath from '@/components/RopePath';
+import { generateCrossedRopes, areRopesUntangled, countIntersections, type Rope, type GameBounds } from '@/utils/ropeGenerator';
+import { useGameStore } from '@/store/gameStore';
 
 const { width, height } = Dimensions.get('window');
 
 // Calculate responsive game board dimensions
 const BOARD_MARGIN = 16;
-const BOARD_PADDING = 20;
+const BOARD_PADDING = 30;
 const DOT_RADIUS = 15;
 
 // Make the game board much taller and more responsive
 const BOARD_WIDTH = width - (BOARD_MARGIN * 2);
-// Use more of the available screen height - accounting for header (~140px) and bottom controls (~120px)
-const BOARD_HEIGHT = Math.max(height - 280, 500); // Minimum 500px height, but use available space
+const BOARD_HEIGHT = Math.max(height - 280, 500);
 
 // Game boundaries - properly constrained within the visible game board
-const GAME_BOUNDS = {
-  MIN_X: BOARD_PADDING + DOT_RADIUS,
-  MAX_X: BOARD_WIDTH - BOARD_PADDING - DOT_RADIUS,
-  MIN_Y: BOARD_PADDING + DOT_RADIUS,
-  MAX_Y: BOARD_HEIGHT - BOARD_PADDING - DOT_RADIUS,
+const GAME_BOUNDS: GameBounds = {
+  minX: BOARD_PADDING + DOT_RADIUS,
+  maxX: BOARD_WIDTH - BOARD_PADDING - DOT_RADIUS,
+  minY: BOARD_PADDING + DOT_RADIUS,
+  maxY: BOARD_HEIGHT - BOARD_PADDING - DOT_RADIUS,
 };
 
 interface GameBoardProps {
@@ -31,95 +32,121 @@ interface GameBoardProps {
 }
 
 export default function GameBoard({ levelData }: GameBoardProps) {
-  // Calculate initial positions within bounds - make them much more centralized
-  const centerX = BOARD_WIDTH / 2;
-  const centerY = BOARD_HEIGHT / 2;
-  // Reduce the offset even more to make ropes start very close to center
-  const offset = Math.min(BOARD_WIDTH, BOARD_HEIGHT) * 0.08; // Reduced from 0.15 to 0.08
+  const { currentLevel, completeLevel } = useGameStore();
+  const [ropes, setRopes] = useState<Rope[]>([]);
+  const [ropePositions, setRopePositions] = useState<{ [key: string]: any }>({});
+  const [intersectionCount, setIntersectionCount] = useState(0);
 
-  // Cable 1 (Red) - crossing diagonally but very close to center
-  const cable1Start = {
-    x: useSharedValue(centerX - offset),
-    y: useSharedValue(centerY - offset),
-  };
-  const cable1End = {
-    x: useSharedValue(centerX + offset),
-    y: useSharedValue(centerY + offset),
-  };
-
-  // Cable 2 (Blue) - crossing the other way but very close to center
-  const cable2Start = {
-    x: useSharedValue(centerX - offset),
-    y: useSharedValue(centerY + offset),
-  };
-  const cable2End = {
-    x: useSharedValue(centerX + offset),
-    y: useSharedValue(centerY - offset),
-  };
-
-  // Initialize positions to be very centralized
+  // Generate ropes for the current level
   useEffect(() => {
-    cable1Start.x.value = centerX - offset;
-    cable1Start.y.value = centerY - offset;
-    cable1End.x.value = centerX + offset;
-    cable1End.y.value = centerY + offset;
+    const ropeCount = Math.min(currentLevel + 1, 10); // Start with 2 ropes, max 10
+    const generatedRopes = generateCrossedRopes(ropeCount, GAME_BOUNDS);
+    setRopes(generatedRopes);
     
-    cable2Start.x.value = centerX - offset;
-    cable2Start.y.value = centerY + offset;
-    cable2End.x.value = centerX + offset;
-    cable2End.y.value = centerY - offset;
-  }, []);
+    // Initialize shared values for each rope
+    const positions: { [key: string]: any } = {};
+    generatedRopes.forEach(rope => {
+      positions[rope.id] = {
+        startX: useSharedValue(rope.start.x),
+        startY: useSharedValue(rope.start.y),
+        endX: useSharedValue(rope.end.x),
+        endY: useSharedValue(rope.end.y),
+      };
+    });
+    setRopePositions(positions);
+    
+    // Count initial intersections
+    setIntersectionCount(countIntersections(generatedRopes));
+  }, [currentLevel]);
+
+  // Check for intersections after any rope movement
+  const checkIntersections = useCallback(() => {
+    if (ropes.length === 0 || Object.keys(ropePositions).length === 0) return;
+
+    // Create current rope state from shared values
+    const currentRopes: Rope[] = ropes.map(rope => ({
+      ...rope,
+      start: {
+        x: ropePositions[rope.id]?.startX?.value || rope.start.x,
+        y: ropePositions[rope.id]?.startY?.value || rope.start.y,
+      },
+      end: {
+        x: ropePositions[rope.id]?.endX?.value || rope.end.x,
+        y: ropePositions[rope.id]?.endY?.value || rope.end.y,
+      },
+    }));
+
+    const newIntersectionCount = countIntersections(currentRopes);
+    setIntersectionCount(newIntersectionCount);
+
+    // Check if puzzle is solved
+    if (newIntersectionCount === 0 && ropes.length > 0) {
+      // Small delay to let the animation finish
+      setTimeout(() => {
+        const stars = currentLevel <= 3 ? 3 : currentLevel <= 6 ? 2 : 1;
+        completeLevel(stars);
+      }, 500);
+    }
+  }, [ropes, ropePositions, currentLevel, completeLevel]);
 
   const containerContent = (
     <View style={[styles.container, { height: BOARD_HEIGHT }]}>
       {/* SVG Layer - Behind dots */}
       <View style={styles.svgContainer}>
         <Svg width={BOARD_WIDTH} height={BOARD_HEIGHT} style={styles.svg}>
-          {/* Cable 1 - Red */}
-          <RopePath
-            startPoint={cable1Start}
-            endPoint={cable1End}
-            color="#E74C3C"
-          />
-          
-          {/* Cable 2 - Blue */}
-          <RopePath
-            startPoint={cable2Start}
-            endPoint={cable2End}
-            color="#3498DB"
-          />
+          {ropes.map(rope => {
+            const positions = ropePositions[rope.id];
+            if (!positions) return null;
+            
+            return (
+              <RopePath
+                key={rope.id}
+                startPoint={{ x: positions.startX, y: positions.startY }}
+                endPoint={{ x: positions.endX, y: positions.endY }}
+                color={rope.color}
+              />
+            );
+          })}
         </Svg>
       </View>
 
       {/* Dots Layer - Above SVG */}
       <View style={styles.dotsContainer}>
-        {/* Draggable dots for Cable 1 */}
-        <DraggableDot 
-          position={cable1Start} 
-          color="#E74C3C" 
-          bounds={GAME_BOUNDS}
-        />
-        <DraggableDot 
-          position={cable1End} 
-          color="#E74C3C" 
-          bounds={GAME_BOUNDS}
-        />
+        {ropes.map(rope => {
+          const positions = ropePositions[rope.id];
+          if (!positions) return null;
 
-        {/* Draggable dots for Cable 2 */}
-        <DraggableDot 
-          position={cable2Start} 
-          color="#3498DB" 
-          bounds={GAME_BOUNDS}
-        />
-        <DraggableDot 
-          position={cable2End} 
-          color="#3498DB" 
-          bounds={GAME_BOUNDS}
-        />
+          return (
+            <React.Fragment key={rope.id}>
+              <DraggableDot 
+                position={{ x: positions.startX, y: positions.startY }}
+                color={rope.color}
+                bounds={GAME_BOUNDS}
+                onPositionChange={checkIntersections}
+              />
+              <DraggableDot 
+                position={{ x: positions.endX, y: positions.endY }}
+                color={rope.color}
+                bounds={GAME_BOUNDS}
+                onPositionChange={checkIntersections}
+              />
+            </React.Fragment>
+          );
+        })}
       </View>
 
-      {/* Visual boundary indicator (optional - for debugging) */}
+      {/* Visual boundary indicator */}
       <View style={styles.boundaryIndicator} />
+      
+      {/* Intersection counter for debugging */}
+      {__DEV__ && (
+        <View style={styles.debugInfo}>
+          <View style={styles.debugText}>
+            <View style={styles.debugLabel}>Intersections: {intersectionCount}</View>
+            <View style={styles.debugLabel}>Ropes: {ropes.length}</View>
+          </View>
+        </View>
+      )}
     </View>
   );
 
@@ -142,7 +169,7 @@ export default function GameBoard({ levelData }: GameBoardProps) {
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-    minHeight: 400, // Ensure minimum height
+    minHeight: 400,
   },
   container: {
     backgroundColor: 'rgba(15, 17, 23, 0.5)',
@@ -153,8 +180,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(24, 255, 146, 0.3)',
     overflow: 'hidden',
     position: 'relative',
-    flex: 1, // Allow it to grow
-    // Add subtle shadow for depth
+    flex: 1,
     shadowColor: '#18FF92',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.3,
@@ -168,7 +194,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 1,
-    // Ensure SVG doesn't interfere with touch events
     pointerEvents: 'none',
   },
   svg: {
@@ -183,7 +208,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 2,
-    // Allow touch events to pass through to dots
     pointerEvents: 'box-none',
   },
   boundaryIndicator: {
@@ -198,5 +222,22 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     pointerEvents: 'none',
     zIndex: 0,
+  },
+  debugInfo: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    zIndex: 3,
+    pointerEvents: 'none',
+  },
+  debugText: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 8,
+    borderRadius: 4,
+  },
+  debugLabel: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

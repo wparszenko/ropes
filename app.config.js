@@ -5,7 +5,7 @@ export default {
     slug: "tangle-escape",
     version: "1.0.0",
     sdkVersion: "53.0.0",
-    platforms: ["ios", "android"],
+    platforms: ["ios", "android", "web"],
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     splash: {

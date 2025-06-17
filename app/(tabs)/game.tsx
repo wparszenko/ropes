@@ -49,9 +49,9 @@ export default function GameScreen() {
     setLevelData(data);
   }, [currentLevel]);
 
-  // Enhanced timer effect - stops when level is completed or failed
+  // Enhanced timer effect - starts/stops based on game state
   useEffect(() => {
-    // Clear any existing timer
+    // Clear any existing timer first
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -84,14 +84,6 @@ export default function GameScreen() {
       }
     };
   }, [gameState, decrementTime]);
-
-  // Stop timer immediately when game state changes from playing
-  useEffect(() => {
-    if (gameState !== 'playing' && timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-  }, [gameState]);
 
   // Handle level completion with new star system
   useEffect(() => {

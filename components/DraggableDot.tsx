@@ -9,7 +9,6 @@ import {
   Gesture,
   GestureDetector,
 } from 'react-native-gesture-handler';
-import { BOUNDS } from '@/components/GameBoard';
 
 interface DraggableDotProps {
   position: {
@@ -18,6 +17,12 @@ interface DraggableDotProps {
   };
   color?: string;
   onPositionChange?: () => void;
+  bounds?: {
+    MIN_X: number;
+    MAX_X: number;
+    MIN_Y: number;
+    MAX_Y: number;
+  };
 }
 
 // Clamp function to constrain values within bounds
@@ -26,28 +31,27 @@ const clamp = (value: number, min: number, max: number) => {
   return Math.min(Math.max(value, min), max);
 };
 
-export default function DraggableDot({ position, color = '#2ECC71', onPositionChange }: DraggableDotProps) {
-  // Store initial position for gesture
-  const startPosition = { x: 0, y: 0 };
-
+export default function DraggableDot({ 
+  position, 
+  color = '#2ECC71', 
+  onPositionChange,
+  bounds = { MIN_X: 40, MAX_X: 320, MIN_Y: 40, MAX_Y: 600 }
+}: DraggableDotProps) {
+  
   const panGesture = Gesture.Pan()
-    .onStart(() => {
-      'worklet';
-      startPosition.x = position.x.value;
-      startPosition.y = position.y.value;
-    })
     .onUpdate((event) => {
       'worklet';
       // Apply constraints to keep dot within bounds
+      // Use current position + translation to avoid jumping
       const newX = clamp(
-        startPosition.x + event.translationX,
-        BOUNDS.MIN_X,
-        BOUNDS.MAX_X
+        position.x.value + event.changeX,
+        bounds.MIN_X,
+        bounds.MAX_X
       );
       const newY = clamp(
-        startPosition.y + event.translationY,
-        BOUNDS.MIN_Y,
-        BOUNDS.MAX_Y
+        position.y.value + event.changeY,
+        bounds.MIN_Y,
+        bounds.MAX_Y
       );
       
       position.x.value = newX;

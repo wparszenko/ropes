@@ -8,12 +8,12 @@ import RopePath from '@/components/RopePath';
 
 const { width, height } = Dimensions.get('window');
 
-// Game boundaries - adjusted for better web experience
-export const BOUNDS = {
-  MIN_X: 40,
-  MAX_X: width - 40,
-  MIN_Y: 150,
-  MAX_Y: height - 100,
+// Game boundaries - constrained to the game board area
+const GAME_BOARD_BOUNDS = {
+  MIN_X: 50,  // 16 (margin) + 34 (padding from border)
+  MAX_X: width - 82,  // width - 16 (margin) - 50 (padding from border) - 16 (dot radius compensation)
+  MIN_Y: 50,  // Top padding
+  MAX_Y: height - 350,  // Bottom constraint considering UI elements
 };
 
 interface GameBoardProps {
@@ -23,29 +23,29 @@ interface GameBoardProps {
 export default function GameBoard({ levelData }: GameBoardProps) {
   // Cable 1 (Red) - shared values for endpoints
   const cable1Start = {
-    x: useSharedValue(80),
-    y: useSharedValue(200),
+    x: useSharedValue(100),
+    y: useSharedValue(150),
   };
   const cable1End = {
-    x: useSharedValue(280),
-    y: useSharedValue(350),
+    x: useSharedValue(250),
+    y: useSharedValue(250),
   };
 
   // Cable 2 (Blue) - shared values for endpoints
   const cable2Start = {
-    x: useSharedValue(120),
-    y: useSharedValue(450),
+    x: useSharedValue(100),
+    y: useSharedValue(250),
   };
   const cable2End = {
-    x: useSharedValue(240),
-    y: useSharedValue(300),
+    x: useSharedValue(250),
+    y: useSharedValue(150),
   };
 
   const containerContent = (
     <View style={styles.container}>
       {/* SVG Layer - Behind dots */}
       <View style={styles.svgContainer}>
-        <Svg width={width} height={height} style={styles.svg}>
+        <Svg width="100%" height="100%" style={styles.svg}>
           {/* Cable 1 - Red */}
           <RopePath
             startPoint={cable1Start}
@@ -65,12 +65,28 @@ export default function GameBoard({ levelData }: GameBoardProps) {
       {/* Dots Layer - Above SVG */}
       <View style={styles.dotsContainer}>
         {/* Draggable dots for Cable 1 */}
-        <DraggableDot position={cable1Start} color="#E74C3C" />
-        <DraggableDot position={cable1End} color="#E74C3C" />
+        <DraggableDot 
+          position={cable1Start} 
+          color="#E74C3C" 
+          bounds={GAME_BOARD_BOUNDS}
+        />
+        <DraggableDot 
+          position={cable1End} 
+          color="#E74C3C" 
+          bounds={GAME_BOARD_BOUNDS}
+        />
 
         {/* Draggable dots for Cable 2 */}
-        <DraggableDot position={cable2Start} color="#3498DB" />
-        <DraggableDot position={cable2End} color="#3498DB" />
+        <DraggableDot 
+          position={cable2Start} 
+          color="#3498DB" 
+          bounds={GAME_BOARD_BOUNDS}
+        />
+        <DraggableDot 
+          position={cable2End} 
+          color="#3498DB" 
+          bounds={GAME_BOARD_BOUNDS}
+        />
       </View>
     </View>
   );
@@ -96,6 +112,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(24, 255, 146, 0.3)',
     overflow: 'hidden',
+    position: 'relative',
   },
   svgContainer: {
     position: 'absolute',
